@@ -1,0 +1,59 @@
+# reseed.yml — P2-ETF-DLINEAR-CROSS
+# ONE-TIME manual workflow to seed the full OHLCV dataset.
+# Option A (Equity ETFs)            : from 2006-01-01
+# Option B (Fixed Income/Commodity) : from 2008-01-01
+#
+# Run ONCE after creating the HF dataset repo.
+# Trigger manually from GitHub Actions UI only.
+# You can seed both modules in one run, or select A or B individually.
+
+name: Reseed Dataset
+
+on:
+  workflow_dispatch:
+    inputs:
+      module:
+        description: "Module to seed: A (equity), B (fixed income), or both"
+        required: true
+        default: "both"
+        type: choice
+        options:
+          - both
+          - A
+          - B
+
+jobs:
+  reseed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run reseed — Both modules
+        if: ${{ github.event.inputs.module == 'both' }}
+        run: python reseed.py
+
+      - name: Run reseed — Module A (Equity) only
+        if: ${{ github.event.inputs.module == 'A' }}
+        run: python reseed.py --module A
+
+      - name: Run reseed — Module B (Fixed Income) only
+        if: ${{ github.event.inputs.module == 'B' }}
+        run: python reseed.py --module B
+
+      - name: Log completion
+        run: echo "✅ Reseed complete for module=${{ github.event.inputs.module }} at $(date -u)"
