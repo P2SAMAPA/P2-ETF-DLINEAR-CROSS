@@ -1,0 +1,15 @@
+# P2-ETF-DLINEAR-CROSS — requirements.txt
+# Core data + HuggingFace dependencies (seeding phase)
+yfinance>=0.2.40
+pandas>=2.0.0
+pyarrow>=14.0.0
+huggingface_hub>=0.22.0
+
+# Training dependencies (used in later phases)
+torch>=2.2.0
+numpy>=1.26.0
+scikit-learn>=1.4.0
+
+# Streamlit app
+streamlit>=1.35.0
+plotly>=5.20.0
