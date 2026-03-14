@@ -9,6 +9,9 @@ on:
     - cron: "0 22 * * 1-5"    # Mon–Fri at 22:00 UTC (30 min after dataset update)
   workflow_dispatch:           # manual trigger from GitHub Actions UI
 
+permissions:
+  contents: write              # allow bot to push results back to repo
+
 jobs:
   train_equity:
     runs-on: ubuntu-latest
