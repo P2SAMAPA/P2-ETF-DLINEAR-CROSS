@@ -8,7 +8,8 @@ Usage:
   python train.py --module A
   python train.py --module B
 
-Saves best model weights (by val loss) to results/{equity|fixed_income}/
+Saves date-stamped model weights to results/{equity|fixed_income}/
+Cleans up previous date files (keeps performance_history.json always).
 """
 
 import os
@@ -38,7 +39,7 @@ def train_epoch(model, loader, optimizer, loss_fn, cfg, device):
     for X, Y in loader:
         X, Y = X.to(device), Y.to(device)
         optimizer.zero_grad()
-        O    = model(X)                         # (batch, N+1)
+        O    = model(X)
         loss = loss_fn(O, Y, gamma=cfg.GAMMA)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
@@ -62,23 +63,22 @@ def eval_epoch(model, loader, loss_fn, cfg, device):
 # ── Train one model ───────────────────────────────────────────────────────────
 
 def train_model(model_name: str, cfg, train_loader, val_loader, device) -> dict:
-    """Train a single model and return best weights + metrics."""
     print(f"\n{'='*55}")
     print(f"  Training {model_name.upper()} — Module {cfg.MODULE} ({cfg.LABEL})")
     print(f"{'='*55}")
 
-    model   = get_model(model_name, cfg).to(device)
-    loss_fn = get_loss_fn("L2")
+    model     = get_model(model_name, cfg).to(device)
+    loss_fn   = get_loss_fn("L2")
     optimizer = optim.Adam(model.parameters(), lr=cfg.LR)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode="min", factor=0.5, patience=10
     )
 
-    best_val_loss   = float("inf")
-    best_state      = None
-    patience_count  = 0
-    early_stop      = 20    # stop if no improvement for 20 epochs
-    history         = {"train": [], "val": []}
+    best_val_loss  = float("inf")
+    best_state     = None
+    patience_count = 0
+    early_stop     = 20
+    history        = {"train": [], "val": []}
 
     for epoch in range(1, cfg.EPOCHS + 1):
         train_loss = train_epoch(model, train_loader, optimizer, loss_fn, cfg, device)
@@ -97,23 +97,50 @@ def train_model(model_name: str, cfg, train_loader, val_loader, device) -> dict:
         else:
             patience_count += 1
             if patience_count >= early_stop:
-                print(f"  ⏹  Early stopping at epoch {epoch} (no improvement for {early_stop} epochs)")
+                print(f"  ⏹  Early stopping at epoch {epoch}")
                 break
 
     print(f"  ✅ Best val loss: {best_val_loss:.4f}")
     return {
-        "state_dict": best_state,
-        "best_val_loss": best_val_loss,
-        "history": history,
+        "state_dict":     best_state,
+        "best_val_loss":  best_val_loss,
+        "history":        history,
         "epochs_trained": len(history["train"]),
     }
 
 
+# ── Cleanup old date-stamped files ────────────────────────────────────────────
+
+def cleanup_old_files(results_dir: str, today_str: str):
+    """
+    Remove date-stamped files from previous runs.
+    Keeps: performance_history.json and today's files.
+    Removes: anything with _YYYYMMDD suffix that isn't today.
+    """
+    keep = {"performance_history.json"}
+    deleted = []
+    for fname in os.listdir(results_dir):
+        if fname in keep:
+            continue
+        parts = fname.rsplit("_", 1)
+        if len(parts) == 2:
+            date_part = parts[1].split(".")[0]
+            if date_part.isdigit() and len(date_part) == 8 and date_part != today_str:
+                fpath = os.path.join(results_dir, fname)
+                os.remove(fpath)
+                deleted.append(fname)
+    if deleted:
+        print(f"  🧹 Cleaned {len(deleted)} old file(s): {deleted}")
+    else:
+        print(f"  🧹 No old files to clean up")
+
+
 # ── Save model ────────────────────────────────────────────────────────────────
 
-def save_model(model_name: str, result: dict, cfg):
+def save_model(model_name: str, result: dict, cfg, today_str: str):
     os.makedirs(cfg.RESULTS_DIR, exist_ok=True)
-    weight_path = os.path.join(cfg.RESULTS_DIR, f"{model_name}_best.pt")
+
+    weight_path = os.path.join(cfg.RESULTS_DIR, f"{model_name}_best_{today_str}.pt")
     torch.save(result["state_dict"], weight_path)
     print(f"  💾 Saved weights → {weight_path}")
 
@@ -124,6 +151,7 @@ def save_model(model_name: str, result: dict, cfg):
         "best_val_loss":  result["best_val_loss"],
         "epochs_trained": result["epochs_trained"],
         "trained_at":     datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "run_date":       today_str,
         "test_year":      cfg.TEST_YEAR,
         "val_year":       cfg.VAL_YEAR,
         "tickers":        cfg.TICKERS,
@@ -131,10 +159,54 @@ def save_model(model_name: str, result: dict, cfg):
         "seq_len":        cfg.SEQ_LEN,
         "history":        result["history"],
     }
-    meta_path = os.path.join(cfg.RESULTS_DIR, f"{model_name}_meta.json")
+    meta_path = os.path.join(cfg.RESULTS_DIR, f"{model_name}_meta_{today_str}.json")
     with open(meta_path, "w") as f:
         json.dump(meta, f, indent=2)
     print(f"  📝 Saved metadata → {meta_path}")
+
+
+# ── Update performance history ────────────────────────────────────────────────
+
+def update_performance_history(results_dir: str, today_str: str, eval_path: str):
+    """
+    Append today's eval metrics to the permanent performance_history.json.
+    This file is never deleted — it accumulates every run's returns.
+    """
+    history_path = os.path.join(results_dir, "performance_history.json")
+
+    # Load existing history
+    if os.path.exists(history_path):
+        with open(history_path) as f:
+            history = json.load(f)
+    else:
+        history = []
+
+    # Load today's eval results
+    if not os.path.exists(eval_path):
+        print(f"  ⚠️  No eval results found at {eval_path}, skipping history update")
+        return
+
+    with open(eval_path) as f:
+        eval_data = json.load(f)
+
+    # Build history entry
+    entry = {
+        "run_date":    today_str,
+        "test_year":   eval_data.get("test_year"),
+        "buy_and_hold": eval_data.get("buy_and_hold", {}).get("metrics", {}),
+        "models":      {
+            m: eval_data["models"][m].get("metrics", {})
+            for m in eval_data.get("models", {})
+        }
+    }
+
+    # Replace entry for today if already exists, else append
+    history = [e for e in history if e.get("run_date") != today_str]
+    history.append(entry)
+
+    with open(history_path, "w") as f:
+        json.dump(history, f, indent=2)
+    print(f"  📈 Updated performance_history.json ({len(history)} runs recorded)")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -147,16 +219,17 @@ def main():
     )
     args = parser.parse_args()
 
-    # Dynamically load config
+    today_str = datetime.utcnow().strftime("%Y%m%d")
+
     cfg_map = {"A": "config_equity", "B": "config_fixed_income"}
     cfg     = importlib.import_module(cfg_map[args.module])
 
-    device  = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"\n🖥  Device: {device}")
-    print(f"📦 Module {cfg.MODULE}: {cfg.LABEL}")
-    print(f"📈 Tickers: {cfg.TICKERS}")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"\n🖥  Device     : {device}")
+    print(f"📦 Module     : {cfg.MODULE} — {cfg.LABEL}")
+    print(f"📅 Run date   : {today_str}")
+    print(f"📈 Tickers    : {cfg.TICKERS}")
 
-    # Load data
     token = os.getenv("HF_TOKEN")
     train_loader, val_loader, test_loader, n_features, scaler = load_data(
         cfg,
@@ -165,19 +238,24 @@ def main():
         token      = token,
     )
 
+    os.makedirs(cfg.RESULTS_DIR, exist_ok=True)
+
+    # Clean up old dated files before saving new ones
+    cleanup_old_files(cfg.RESULTS_DIR, today_str)
+
     # Train both models
     for model_name in ["dlinear", "crossformer"]:
         result = train_model(model_name, cfg, train_loader, val_loader, device)
-        save_model(model_name, result, cfg)
+        save_model(model_name, result, cfg, today_str)
 
-    # Save scaler for inference
+    # Save scaler with date stamp
     import pickle
-    scaler_path = os.path.join(cfg.RESULTS_DIR, "scaler.pkl")
+    scaler_path = os.path.join(cfg.RESULTS_DIR, f"scaler_{today_str}.pkl")
     with open(scaler_path, "wb") as f:
         pickle.dump(scaler, f)
     print(f"\n📐 Saved scaler → {scaler_path}")
 
-    print(f"\n🎉 Training complete for Module {cfg.MODULE}")
+    print(f"\n🎉 Training complete for Module {cfg.MODULE} [{today_str}]")
 
 
 if __name__ == "__main__":
