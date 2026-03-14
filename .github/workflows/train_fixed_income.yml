@@ -9,6 +9,9 @@ on:
     - cron: "30 22 * * 1-5"   # Mon–Fri at 22:30 UTC (staggered 30 min after equity)
   workflow_dispatch:           # manual trigger from GitHub Actions UI
 
+permissions:
+  contents: write              # allow bot to push results back to repo
+
 jobs:
   train_fixed_income:
     runs-on: ubuntu-latest
@@ -16,7 +19,6 @@ jobs:
 
     env:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
-
 
     steps:
       - name: Checkout repository
