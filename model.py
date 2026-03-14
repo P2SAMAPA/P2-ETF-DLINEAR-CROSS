@@ -26,13 +26,19 @@ class TradingHead(nn.Module):
     """
     Final N+1 output layer with tanh activation.
     Maps any backbone's last hidden state → trading decisions.
+    Bias is initialised away from zero to prevent hold-collapse at start.
     """
-    def __init__(self, in_features: int, n_assets: int):
+    def __init__(self, in_features: int, n_assets: int, bias_init: float = 0.5):
         super().__init__()
-        self.fc   = nn.Linear(in_features, n_assets + 1)   # N ETFs + 1 Hold
+        self.fc = nn.Linear(in_features, n_assets + 1)   # N ETFs + 1 Hold
+        # Initialise ETF output biases to +bias_init to encourage early trading
+        # Hold node bias initialised to 0 to not favour holding cash
+        nn.init.constant_(self.fc.bias, 0.0)
+        with torch.no_grad():
+            self.fc.bias[:n_assets] = bias_init
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return torch.tanh(self.fc(x))                       # (batch, N+1)
+        return torch.tanh(self.fc(x))                     # (batch, N+1)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -67,7 +73,7 @@ class DLinear(nn.Module):
     Output : (batch, N+1)  — tanh-bounded trading decisions
     """
     def __init__(self, seq_len: int, n_features: int, n_assets: int,
-                 individual: bool = False, kernel_size: int = 25):
+                 individual: bool = False, kernel_size: int = 25, bias_init: float = 0.5):
         super().__init__()
         self.seq_len    = seq_len
         self.n_features = n_features
@@ -87,7 +93,7 @@ class DLinear(nn.Module):
             self.linear_trend    = nn.Linear(seq_len, 1)
 
         # Flatten (1, n_features) → n_features → trading head
-        self.head = TradingHead(n_features, n_assets)
+        self.head = TradingHead(n_features, n_assets, bias_init)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: (batch, seq_len, n_feat)
@@ -205,7 +211,7 @@ class Crossformer(nn.Module):
     def __init__(self, seq_len: int, n_features: int, n_assets: int,
                  d_model: int = 64, n_heads: int = 2, e_layers: int = 2,
                  d_ff: int = 128, seg_len: int = 12,
-                 dropout: float = 0.2):
+                 dropout: float = 0.2, bias_init: float = 0.5):
         super().__init__()
         self.patch_emb = PatchEmbedding(seg_len, d_model, n_features, dropout)
         self.encoder   = nn.ModuleList([
@@ -214,7 +220,7 @@ class Crossformer(nn.Module):
         ])
         self.norm = nn.LayerNorm(d_model)
         # Pool over segments and features → flat vector → trading head
-        self.head = TradingHead(d_model, n_assets)
+        self.head = TradingHead(d_model, n_assets, bias_init)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: (batch, seq_len, n_feat)
@@ -238,12 +244,15 @@ def get_model(model_name: str, cfg) -> nn.Module:
     n_feat   = cfg.N_ASSETS * 6     # 6 features per ETF (close, return, vol_change, ma5, ma20, rsi)
     n_assets = cfg.N_ASSETS
 
+    bias_init = getattr(cfg, 'OUTPUT_BIAS_INIT', 0.5)
+
     if model_name.lower() == "dlinear":
         return DLinear(
             seq_len    = cfg.SEQ_LEN,
             n_features = n_feat,
             n_assets   = n_assets,
             individual = cfg.DLINEAR_INDIVIDUAL,
+            bias_init  = bias_init,
         )
     elif model_name.lower() == "crossformer":
         return Crossformer(
@@ -256,6 +265,7 @@ def get_model(model_name: str, cfg) -> nn.Module:
             d_ff       = cfg.CROSS_D_FF,
             seg_len    = cfg.CROSS_SEG_LEN,
             dropout    = cfg.CROSS_DROPOUT,
+            bias_init  = bias_init,
         )
     else:
         raise ValueError(f"Unknown model: {model_name}. Choose 'dlinear' or 'crossformer'.")
