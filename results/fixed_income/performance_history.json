@@ -1,0 +1,29 @@
+[
+  {
+    "run_date": "20260314",
+    "test_year": 2023,
+    "buy_and_hold": {
+      "annual_return_pct": 0.0427,
+      "sharpe_ratio": 0.916,
+      "max_drawdown_pct": -0.0759,
+      "final_value": 10004.27,
+      "initial_value": 10000.0
+    },
+    "models": {
+      "dlinear": {
+        "annual_return_pct": 0.0,
+        "sharpe_ratio": 0.4753,
+        "max_drawdown_pct": -0.0002,
+        "final_value": 10000.0,
+        "initial_value": 10000.0
+      },
+      "crossformer": {
+        "annual_return_pct": 0.0,
+        "sharpe_ratio": 0.0,
+        "max_drawdown_pct": 0.0,
+        "final_value": 10000.0,
+        "initial_value": 10000.0
+      }
+    }
+  }
+]
