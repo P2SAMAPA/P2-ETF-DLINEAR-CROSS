@@ -1,27 +1,27 @@
 [
   {
     "run_date": "20260314",
-    "test_year": 2023,
+    "test_year": "latest 10% of data",
     "buy_and_hold": {
-      "annual_return_pct": 0.0427,
-      "sharpe_ratio": 0.916,
-      "max_drawdown_pct": -0.0759,
-      "final_value": 10004.27,
+      "annual_return_pct": 0.3408,
+      "sharpe_ratio": 1.4814,
+      "max_drawdown_pct": -0.1292,
+      "final_value": 10034.08,
       "initial_value": 10000.0
     },
     "models": {
       "dlinear": {
-        "annual_return_pct": 0.0,
-        "sharpe_ratio": 0.4753,
-        "max_drawdown_pct": -0.0002,
-        "final_value": 10000.0,
+        "annual_return_pct": 0.0003,
+        "sharpe_ratio": 0.9068,
+        "max_drawdown_pct": -0.0001,
+        "final_value": 10000.03,
         "initial_value": 10000.0
       },
       "crossformer": {
-        "annual_return_pct": 0.0,
-        "sharpe_ratio": 0.0,
-        "max_drawdown_pct": 0.0,
-        "final_value": 10000.0,
+        "annual_return_pct": -0.0008,
+        "sharpe_ratio": -0.9263,
+        "max_drawdown_pct": -0.0014,
+        "final_value": 9999.92,
         "initial_value": 10000.0
       }
     }
