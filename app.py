@@ -12,6 +12,7 @@ Data sources:
 """
 
 import os
+import sys
 import json
 import pickle
 import numpy as np
@@ -22,6 +23,9 @@ import plotly.graph_objects as go
 import plotly.express as px
 from huggingface_hub import hf_hub_download
 from datetime import datetime
+
+# Ensure repo root is on path regardless of how the script is invoked
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from data_loader import build_features
 from model import get_model
