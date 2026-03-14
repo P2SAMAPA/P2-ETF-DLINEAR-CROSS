@@ -71,7 +71,7 @@ def train_model(model_name: str, cfg, train_loader, val_loader, device) -> dict:
     loss_fn = get_loss_fn("L2")
     optimizer = optim.Adam(model.parameters(), lr=cfg.LR)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="min", factor=0.5, patience=10, verbose=False
+        optimizer, mode="min", factor=0.5, patience=10
     )
 
     best_val_loss   = float("inf")
