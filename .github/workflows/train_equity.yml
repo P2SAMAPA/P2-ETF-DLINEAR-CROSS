@@ -1,0 +1,51 @@
+# train_equity.yml — P2-ETF-DLINEAR-CROSS
+# Trains DLinear + Crossformer on Option A (Equity ETFs).
+# Runs daily after dataset update, and supports manual trigger.
+
+name: Train — Option A (Equity ETFs)
+
+on:
+  schedule:
+    - cron: "0 22 * * 1-5"    # Mon–Fri at 22:00 UTC (30 min after dataset update)
+  workflow_dispatch:           # manual trigger from GitHub Actions UI
+
+jobs:
+  train_equity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120       # CPU training may take up to 2 hours
+
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Train Option A models (DLinear + Crossformer)
+        run: python train.py --module A
+
+      - name: Evaluate Option A models
+        run: python evaluate.py --module A
+
+      - name: Commit results back to repo
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add results/equity/
+          git diff --staged --quiet || git commit -m "chore: update equity model results [$(date -u '+%Y-%m-%d %H:%M UTC')]"
+          git push
+
+      - name: Log completion
+        run: echo "✅ Equity training complete at $(date -u)"
