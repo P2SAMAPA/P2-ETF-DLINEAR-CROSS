@@ -95,10 +95,25 @@ def load_hf_metadata(module: str) -> dict:
         return {}
 
 
+def latest_dated_file(directory: str, prefix: str, suffix: str):
+    """Find the most recent date-stamped file: prefix_YYYYMMDD.suffix"""
+    if not os.path.exists(directory):
+        return None
+    matches = []
+    for fname in os.listdir(directory):
+        if fname.startswith(prefix + "_") and fname.endswith(suffix):
+            date_part = fname[len(prefix)+1 : -len(suffix)]
+            if date_part.isdigit() and len(date_part) == 8:
+                matches.append((date_part, os.path.join(directory, fname)))
+    if not matches:
+        return None
+    return sorted(matches)[-1][1]
+
+
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_eval_results(module: str) -> dict:
-    path = os.path.join(RESULTS_MAP[module], "eval_results.json")
-    if not os.path.exists(path):
+    path = latest_dated_file(RESULTS_MAP[module], "eval_results", ".json")
+    if not path:
         return {}
     with open(path) as f:
         return json.load(f)
@@ -106,9 +121,18 @@ def load_eval_results(module: str) -> dict:
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_model_meta(module: str, model_name: str) -> dict:
-    path = os.path.join(RESULTS_MAP[module], f"{model_name}_meta.json")
-    if not os.path.exists(path):
+    path = latest_dated_file(RESULTS_MAP[module], f"{model_name}_meta", ".json")
+    if not path:
         return {}
+    with open(path) as f:
+        return json.load(f)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_performance_history(module: str) -> list:
+    path = os.path.join(RESULTS_MAP[module], "performance_history.json")
+    if not os.path.exists(path):
+        return []
     with open(path) as f:
         return json.load(f)
 
@@ -123,10 +147,10 @@ def generate_signals(module: str, model_name: str) -> pd.DataFrame | None:
     """
     cfg = cfg_a if module == "A" else cfg_b
 
-    weight_path = os.path.join(RESULTS_MAP[module], f"{model_name}_best.pt")
-    scaler_path = os.path.join(RESULTS_MAP[module], "scaler.pkl")
+    weight_path = latest_dated_file(RESULTS_MAP[module], f"{model_name}_best", ".pt")
+    scaler_path = latest_dated_file(RESULTS_MAP[module], "scaler", ".pkl")
 
-    if not os.path.exists(weight_path) or not os.path.exists(scaler_path):
+    if not weight_path or not scaler_path:
         return None
 
     # Load OHLCV
