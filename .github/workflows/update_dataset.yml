@@ -1,0 +1,57 @@
+# update_dataset.yml — P2-ETF-DLINEAR-CROSS
+# DAILY workflow to append the latest trading day to the HF dataset.
+# Runs after US market close (21:30 UTC = 5:30pm ET).
+# Also supports manual trigger with module selection.
+
+name: Update Dataset (Daily)
+
+on:
+  schedule:
+    - cron: "30 21 * * 1-5"   # Mon–Fri at 21:30 UTC (after US market close)
+  workflow_dispatch:
+    inputs:
+      module:
+        description: "Module to update: A (equity), B (fixed income), or both"
+        required: true
+        default: "both"
+        type: choice
+        options:
+          - both
+          - A
+          - B
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run update — Both modules (scheduled)
+        if: ${{ github.event_name == 'schedule' || github.event.inputs.module == 'both' }}
+        run: python update_dataset.py
+
+      - name: Run update — Module A (Equity) only
+        if: ${{ github.event.inputs.module == 'A' }}
+        run: python update_dataset.py --module A
+
+      - name: Run update — Module B (Fixed Income) only
+        if: ${{ github.event.inputs.module == 'B' }}
+        run: python update_dataset.py --module B
+
+      - name: Log completion
+        run: echo "✅ Dataset update complete at $(date -u)"
