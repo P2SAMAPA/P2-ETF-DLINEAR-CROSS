@@ -16,6 +16,7 @@ Saves results/{equity|fixed_income}/eval_results.json
 """
 
 import os
+import sys
 import json
 import pickle
 import argparse
@@ -24,6 +25,9 @@ import numpy as np
 import pandas as pd
 import torch
 from datetime import datetime
+
+# Ensure repo root is on path regardless of how the script is invoked
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from data_loader import load_data
 from model import get_model
