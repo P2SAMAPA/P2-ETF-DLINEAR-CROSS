@@ -214,7 +214,7 @@ def main():
     results = {
         "module":       cfg.MODULE,
         "label":        cfg.LABEL,
-        "test_year":    cfg.TEST_YEAR,
+        "test_year":    f"latest {int(cfg.SPLIT_TEST_RATIO*100)}% of data",
         "run_date":     today_str,
         "tickers":      cfg.TICKERS,
         "evaluated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
