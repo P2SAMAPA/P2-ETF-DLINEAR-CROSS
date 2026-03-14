@@ -12,6 +12,7 @@ Saves best model weights (by val loss) to results/{equity|fixed_income}/
 """
 
 import os
+import sys
 import json
 import argparse
 import importlib
@@ -20,6 +21,9 @@ import torch
 import torch.optim as optim
 from datetime import datetime
 from copy import deepcopy
+
+# Ensure repo root is on path regardless of how the script is invoked
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from data_loader import load_data
 from model import get_model
