@@ -25,5 +25,17 @@
         "initial_value": 10000.0
       }
     }
+  },
+  {
+    "run_date": "20260315",
+    "test_year": "latest 10% of data",
+    "buy_and_hold": {
+      "annual_return_pct": 0.5179,
+      "sharpe_ratio": 0.9715,
+      "max_drawdown_pct": -0.392,
+      "final_value": 10051.79,
+      "initial_value": 10000.0
+    },
+    "models": {}
   }
 ]
