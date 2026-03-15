@@ -1,0 +1,59 @@
+# train_equity_linear.yml — P2-ETF-DLINEAR-CROSS
+# Trains DLinear + MoLE-DLinear variants on Option A (Equity ETFs)
+# Variants: dlinear_prc, dlinear_ret, mole_prc, mole_ret
+
+name: Train — Option A Equity (Linear Models)
+
+on:
+  schedule:
+    - cron: "0 22 * * 1-5"    # Mon-Fri 22:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  train_equity_linear:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180       # DLinear + MoLE ~3 hours
+
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      TRAIN_VARIANTS: "dlinear_prc,dlinear_ret,mole_prc,mole_ret"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Train DLinear + MoLE variants (Option A)
+        run: python train.py --module A --variants dlinear_prc dlinear_ret mole_prc mole_ret
+
+      - name: Evaluate Option A (Linear)
+        run: python evaluate.py --module A
+
+      - name: Commit results
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add results/equity/ results/archive/
+          git stash
+          git pull --rebase origin main
+          git stash pop
+          git add results/equity/ results/archive/
+          git diff --staged --quiet || git commit -m "chore: equity linear model results [$(date -u '+%Y-%m-%d %H:%M UTC')]"
+          git push
+
+      - name: Log completion
+        run: echo "✅ Equity linear training complete at $(date -u)"
