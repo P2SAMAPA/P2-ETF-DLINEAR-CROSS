@@ -375,10 +375,12 @@ def main():
         st.warning("⚠️ Research only. Not financial advice.")
 
     # Tabs
-    tab1, tab2, tab3 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "🎯 Next-Day Signals",
         "📊 Backtest Performance",
         "🔧 Model Info",
+        "📋 Equity Summary",
+        "📋 Fixed Income Summary",
     ])
 
     # ── Tab 1: Next-Day Signals ───────────────────────────────────────────────
@@ -526,6 +528,140 @@ def main():
                 st.plotly_chart(fig, use_container_width=True)
             except Exception as e:
                 st.warning(f"Could not load price chart: {e}")
+
+
+    # ── Helper: render one module summary ────────────────────────────────────
+    def render_summary_tab(sum_module: str, sum_cfg, sum_label: str):
+        """Render the full 4-variant summary for a given module."""
+        next_day = next_trading_day()
+        last_day = last_trading_day()
+        st.info(f"📅 **Prediction for:** {next_day}  |  Data through: {last_day}")
+
+        VARIANTS = [
+            ("dlinear_prc",     "DLinear + PRC"),
+            ("crossformer_prc", "Crossformer + PRC"),
+            ("dlinear_ret",     "DLinear + RET"),
+            ("crossformer_ret", "Crossformer + RET"),
+        ]
+
+        hf_meta_sum  = load_hf_metadata(sum_module)
+        cache_key    = hf_meta_sum.get("last_data_update", "")
+        eval_results = load_eval_results(sum_module)
+
+        # ── Section 1: Next-Day Top 2 Signals for all 4 variants ─────────────
+        st.subheader("🎯 Next-Day Top 2 Signals — All Models")
+        st.caption("Top 2 ETFs by allocation % for each model variant")
+
+        sig_cols = st.columns(4)
+        for col_idx, (variant, variant_label) in enumerate(VARIANTS):
+            with sig_cols[col_idx]:
+                st.markdown(f"**{variant_label}**")
+                signals_df = generate_signals(sum_module, variant, cache_key)
+                if signals_df is None:
+                    st.warning("No weights")
+                else:
+                    # Filter out HOLD (cash) row, sort by allocation
+                    trading = signals_df[signals_df["Ticker"] != "HOLD (cash)"].copy()
+                    trading = trading.sort_values("Allocation%", ascending=False).head(2)
+                    for _, row in trading.iterrows():
+                        icon = "🟢" if row["Signal"] == "BUY" else (
+                               "🔴" if row["Signal"] == "SHORT" else "🟡")
+                        st.metric(
+                            label=f"{icon} {row['Ticker']}",
+                            value=f"{row['Signal']}",
+                            delta=f"{row['Allocation%']:.1f}% allocated"
+                        )
+
+        # ── Section 2: Backtest Metrics Comparison ────────────────────────────
+        st.divider()
+        st.subheader("📊 Backtest Performance — All Models vs Buy & Hold")
+
+        if not eval_results:
+            st.warning("No evaluation results found. Run training first.")
+            return
+
+        test_period = eval_results.get("test_period",
+                      eval_results.get("test_year", "N/A"))
+        st.caption(f"Test period: {test_period}")
+
+        # Buy & Hold baseline row
+        bh = eval_results.get("buy_and_hold", {}).get("metrics", {})
+
+        # Build comparison table
+        rows = []
+        rows.append({
+            "Model":          "📈 Buy & Hold (baseline)",
+            "Annual Return":  f"{bh.get('annual_return_pct', 'N/A')}%",
+            "Sharpe Ratio":   bh.get('sharpe_ratio', 'N/A'),
+            "Max Drawdown":   f"{bh.get('max_drawdown_pct', 'N/A')}%",
+            "Final Value":    f"${bh.get('final_value', 'N/A'):,.2f}" if isinstance(bh.get('final_value'), float) else "N/A",
+        })
+
+        models_data = eval_results.get("models", {})
+        for variant, variant_label in VARIANTS:
+            m = models_data.get(variant, {}).get("metrics", {})
+            if not m:
+                rows.append({
+                    "Model":         f"⚙️ {variant_label}",
+                    "Annual Return": "—",
+                    "Sharpe Ratio":  "—",
+                    "Max Drawdown":  "—",
+                    "Final Value":   "—",
+                })
+            else:
+                # Highlight if beats B&H
+                ret = m.get('annual_return_pct', 0)
+                bh_ret = bh.get('annual_return_pct', 0)
+                prefix = "✅" if isinstance(ret, (int,float)) and isinstance(bh_ret, (int,float)) and ret > bh_ret else "⚙️"
+                rows.append({
+                    "Model":         f"{prefix} {variant_label}",
+                    "Annual Return": f"{ret}%",
+                    "Sharpe Ratio":  m.get('sharpe_ratio', 'N/A'),
+                    "Max Drawdown":  f"{m.get('max_drawdown_pct', 'N/A')}%",
+                    "Final Value":   f"${m.get('final_value', 0):,.2f}" if isinstance(m.get('final_value'), float) else "N/A",
+                })
+
+        metrics_df = pd.DataFrame(rows)
+        st.dataframe(metrics_df, use_container_width=True, hide_index=True)
+
+        # ── Section 3: Portfolio value chart — all 4 variants + B&H ─────────
+        st.divider()
+        st.subheader("📈 Portfolio Value — All Models vs Buy & Hold")
+
+        fig = go.Figure()
+        bh_vals = eval_results.get("buy_and_hold", {}).get("portfolio_values", [])
+        if bh_vals:
+            fig.add_trace(go.Scatter(
+                y=bh_vals, name="Buy & Hold",
+                line=dict(color="#aaaaaa", dash="dash", width=2)
+            ))
+
+        colors = ["#0066ff", "#ff6600", "#00cc44", "#cc00cc"]
+        for (variant, variant_label), color in zip(VARIANTS, colors):
+            vals = models_data.get(variant, {}).get("portfolio_values", [])
+            if vals:
+                fig.add_trace(go.Scatter(
+                    y=vals, name=variant_label,
+                    line=dict(color=color, width=1.5)
+                ))
+
+        fig.update_layout(
+            xaxis_title="Trading Days",
+            yaxis_title="Portfolio Value ($)",
+            height=420,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02),
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    # ── Tab 4: Equity Summary ─────────────────────────────────────────────────
+    with tab4:
+        st.subheader("📋 Equity ETFs — Full Model Comparison")
+        render_summary_tab("A", cfg_a, "Option A — Equity ETFs")
+
+    # ── Tab 5: Fixed Income Summary ───────────────────────────────────────────
+    with tab5:
+        st.subheader("📋 Fixed Income / Commodities — Full Model Comparison")
+        render_summary_tab("B", cfg_b, "Option B — Fixed Income / Commodities")
 
 
 if __name__ == "__main__":
