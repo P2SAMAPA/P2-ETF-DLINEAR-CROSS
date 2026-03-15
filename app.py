@@ -327,12 +327,21 @@ def render_portfolio_chart(eval_results: dict, model_name: str):
 
 def render_metrics_cards(metrics: dict, label: str):
     c1, c2, c3, c4 = st.columns(4)
-    total = metrics.get('total_return_pct', metrics.get('annual_return_pct', 'N/A'))
-    cagr  = metrics.get('annual_return_pct', 'N/A')
-    c1.metric(f"{label} — Total Return",  f"{total}%")
-    c2.metric(f"{label} — CAGR",          f"{cagr}%")
-    c3.metric(f"{label} — Sharpe Ratio",  f"{metrics.get('sharpe_ratio', 'N/A')}")
-    c4.metric(f"{label} — Max Drawdown",  f"{metrics.get('max_drawdown_pct', 'N/A')}%")
+    total  = metrics.get('total_return_pct', metrics.get('annual_return_pct', 'N/A'))
+    n_days = metrics.get('n_days', 0)
+    # Recompute true CAGR from total return and n_days
+    if isinstance(total, (int, float)) and n_days > 0:
+        n_years = n_days / 252.0
+        cagr = round(((1 + total / 100.0) ** (1.0 / n_years) - 1.0) * 100.0, 4)
+        cagr_str = f"{cagr}%"
+        period_str = f"{n_years:.1f} yrs"
+    else:
+        cagr_str   = "N/A"
+        period_str = ""
+    c1.metric(f"Total Return ({period_str})", f"{total}%" if isinstance(total, (int,float)) else "N/A")
+    c2.metric(f"CAGR (Annualised)",            cagr_str)
+    c3.metric(f"Sharpe Ratio",                 f"{metrics.get('sharpe_ratio', 'N/A')}")
+    c4.metric(f"Max Drawdown",                 f"{metrics.get('max_drawdown_pct', 'N/A')}%")
 
 
 # ── Main app ──────────────────────────────────────────────────────────────────
@@ -593,20 +602,33 @@ def main():
 
         # Build comparison table
         rows = []
+        def compute_cagr(total_pct, n_days):
+            """Compute true CAGR from total return % and number of trading days."""
+            if not isinstance(total_pct, (int, float)) or n_days <= 0:
+                return "N/A"
+            n_years = n_days / 252.0
+            if n_years <= 0:
+                return "N/A"
+            cagr = ((1 + total_pct / 100.0) ** (1.0 / n_years) - 1.0) * 100.0
+            return round(cagr, 4)
+
         def fmt_row(label, m, bh_total=None):
             total  = m.get('total_return_pct', m.get('annual_return_pct', 'N/A'))
-            cagr   = m.get('annual_return_pct', 'N/A')
-            n_yrs  = m.get('n_years', '')
+            n_days = m.get('n_days', 0)
+            n_yrs  = m.get('n_years', round(n_days / 252.0, 2) if n_days else 0)
+            # Recompute CAGR properly — don't trust stored annual_return_pct
+            # since old files stored total return in that field
+            cagr   = compute_cagr(total, n_days) if n_days else m.get('annual_return_pct', 'N/A')
             beats  = isinstance(total, (int,float)) and isinstance(bh_total, (int,float)) and total > bh_total
             prefix = "✅" if beats else "⚙️"
             return {
-                "Model":            label if "baseline" in label else f"{prefix} {label}",
-                "Total Return":     f"{total}%" if isinstance(total, (int,float)) else "—",
-                "CAGR (Ann.)":      f"{cagr}%" if isinstance(cagr, (int,float)) else "—",
-                f"Period ({n_yrs}y)": "",
-                "Sharpe Ratio":     m.get('sharpe_ratio', 'N/A'),
-                "Max Drawdown":     f"{m.get('max_drawdown_pct', 'N/A')}%",
-                "Final $10k →":     f"${m.get('final_value', 0):,.2f}" if isinstance(m.get('final_value'), float) else "N/A",
+                "Model":          label if "baseline" in label else f"{prefix} {label}",
+                "Total Return":   f"{total}%" if isinstance(total, (int,float)) else "—",
+                "CAGR (Ann.)":    f"{cagr}%" if isinstance(cagr, (int,float)) else "—",
+                "Test Period":    f"{n_yrs:.1f} yrs" if isinstance(n_yrs, float) and n_yrs > 0 else "—",
+                "Sharpe Ratio":   m.get('sharpe_ratio', 'N/A'),
+                "Max Drawdown":   f"{m.get('max_drawdown_pct', 'N/A')}%",
+                "Final $10k →":   f"${m.get('final_value', 0):,.2f}" if isinstance(m.get('final_value'), float) else "N/A",
             }
 
         bh_total = bh.get('total_return_pct', bh.get('annual_return_pct', 0))
