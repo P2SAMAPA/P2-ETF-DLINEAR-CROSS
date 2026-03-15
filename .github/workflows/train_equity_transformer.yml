@@ -1,6 +1,8 @@
 # train_equity_transformer.yml — P2-ETF-DLINEAR-CROSS
 # Trains Crossformer variants on Option A (Equity ETFs)
 # Variants: crossformer_prc, crossformer_ret
+# NOTE: Evaluation is handled by train_equity_linear.yml
+# which runs in parallel and evaluates ALL variants after training.
 
 name: Train — Option A Equity (Crossformer)
 
@@ -15,7 +17,7 @@ permissions:
 jobs:
   train_equity_transformer:
     runs-on: ubuntu-latest
-    timeout-minutes: 180       # Crossformer ~2.5 hours
+    timeout-minutes: 180
 
     env:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -39,19 +41,24 @@ jobs:
       - name: Train Crossformer variants (Option A)
         run: python train.py --module A --variants crossformer_prc crossformer_ret
 
-      - name: Evaluate Option A (Crossformer)
-        run: python evaluate.py --module A
-
-      - name: Commit results
+      - name: Commit weights only (no evaluate — handled by linear workflow)
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add results/equity/ results/archive/
+          git add results/equity/crossformer_prc_best_20260315.pt \
+                  results/equity/crossformer_prc_meta_20260315.json \
+                  results/equity/crossformer_ret_best_20260315.pt \
+                  results/equity/crossformer_ret_meta_20260315.json \
+                  results/equity/scaler_*.pkl || true
           git stash
           git pull --rebase origin main
           git stash pop
-          git add results/equity/ results/archive/
-          git diff --staged --quiet || git commit -m "chore: equity crossformer model results [$(date -u '+%Y-%m-%d %H:%M UTC')]"
+          git add results/equity/crossformer_prc_best_*.pt \
+                  results/equity/crossformer_prc_meta_*.json \
+                  results/equity/crossformer_ret_best_*.pt \
+                  results/equity/crossformer_ret_meta_*.json \
+                  results/equity/scaler_*.pkl || true
+          git diff --staged --quiet || git commit -m "chore: equity crossformer weights [$(date -u '+%Y-%m-%d %H:%M UTC')]"
           git push
 
       - name: Log completion
