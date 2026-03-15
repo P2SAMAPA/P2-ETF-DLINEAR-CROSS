@@ -68,16 +68,16 @@ def simulate_portfolio(signals: np.ndarray, prices: np.ndarray,
     values = [budget]
 
     for t in range(len(signals) - 1):
-        O    = signals[t]
-        O_n  = O[:N]
-        abs_O = np.abs(O)
+        O     = signals[t]
+        # Handle both N and N+1 output shapes
+        O_n   = O[:N]
+        abs_O = np.abs(O_n)
         total = abs_O.sum()
         if total < 1e-8:
             values.append(budget)
             continue
 
-        V   = abs_O / total       # normalised weights (N+1,)
-        V_n = V[:N]               # trading weights
+        V_n = abs_O / total       # normalised trading weights
         s   = np.sign(O_n)        # buy/short decision
 
         # Daily % return for each ETF
@@ -223,7 +223,7 @@ def evaluate_model(model_name: str, cfg, test_prices: np.ndarray,
     print(f"     Max Drawdown  : {metrics['max_drawdown_pct']:.2f}%")
 
     # Per-ETF stats
-    abs_sigs  = np.abs(signals[:, :N])
+    abs_sigs  = np.abs(signals[:, :N])   # works for both N and N+1 shapes
     total     = abs_sigs.sum(axis=1, keepdims=True).clip(min=1e-8)
     weights   = abs_sigs / total
     avg_alloc = {cfg.TICKERS[i]: round(float(weights[:, i].mean() * 100), 2)
