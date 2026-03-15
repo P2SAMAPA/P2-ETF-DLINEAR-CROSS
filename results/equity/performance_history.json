@@ -28,47 +28,47 @@
   },
   {
     "run_date": "20260315",
-    "test_period": "2024-03-25 \u2192 2026-03-13 (494 rows)",
+    "test_period": "2023-03-30 \u2192 2026-03-13 (741 rows)",
     "buy_and_hold": {
-      "annual_return_pct": 42.3687,
-      "sharpe_ratio": 1.1386,
+      "annual_return_pct": 77.6005,
+      "sharpe_ratio": 1.3193,
       "max_drawdown_pct": -18.214,
-      "final_value": 14236.87,
+      "final_value": 17760.05,
       "initial_value": 10000.0,
-      "n_days": 494
+      "n_days": 741
     },
     "models": {
       "dlinear_prc": {
-        "annual_return_pct": 27.4225,
-        "sharpe_ratio": 0.6165,
-        "max_drawdown_pct": -38.0561,
-        "final_value": 12742.25,
+        "annual_return_pct": 24.3479,
+        "sharpe_ratio": 0.4224,
+        "max_drawdown_pct": -45.8584,
+        "final_value": 12434.79,
         "initial_value": 10000.0,
-        "n_days": 398
+        "n_days": 645
       },
       "crossformer_prc": {
-        "annual_return_pct": 11.4438,
-        "sharpe_ratio": 0.4275,
-        "max_drawdown_pct": -25.7918,
-        "final_value": 11144.38,
+        "annual_return_pct": 24.3266,
+        "sharpe_ratio": 0.4221,
+        "max_drawdown_pct": -45.9237,
+        "final_value": 12432.66,
         "initial_value": 10000.0,
-        "n_days": 398
+        "n_days": 645
       },
       "dlinear_ret": {
-        "annual_return_pct": 100.5686,
-        "sharpe_ratio": 1.6762,
-        "max_drawdown_pct": -18.9705,
-        "final_value": 20056.86,
+        "annual_return_pct": 269.0027,
+        "sharpe_ratio": 1.5906,
+        "max_drawdown_pct": -22.4912,
+        "final_value": 36900.27,
         "initial_value": 10000.0,
-        "n_days": 398
+        "n_days": 645
       },
       "crossformer_ret": {
-        "annual_return_pct": 96.6045,
-        "sharpe_ratio": 1.6741,
-        "max_drawdown_pct": -18.1502,
-        "final_value": 19660.45,
+        "annual_return_pct": 241.665,
+        "sharpe_ratio": 1.5771,
+        "max_drawdown_pct": -21.4016,
+        "final_value": 34166.5,
         "initial_value": 10000.0,
-        "n_days": 398
+        "n_days": 645
       }
     }
   }
