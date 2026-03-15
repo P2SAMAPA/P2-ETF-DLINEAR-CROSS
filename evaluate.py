@@ -236,7 +236,7 @@ def evaluate_model(model_name: str, cfg, test_prices: np.ndarray,
     print(f"     Max Drawdown  : {metrics['max_drawdown_pct']:.2f}%")
 
     # Per-ETF stats
-    abs_sigs  = np.abs(signals[:, :N])   # works for both N and N+1 shapes
+    abs_sigs  = np.abs(signals[:, :N])
     total     = abs_sigs.sum(axis=1, keepdims=True).clip(min=1e-8)
     weights   = abs_sigs / total
     avg_alloc = {cfg.TICKERS[i]: round(float(weights[:, i].mean() * 100), 2)
@@ -246,11 +246,28 @@ def evaluate_model(model_name: str, cfg, test_prices: np.ndarray,
     buy_ratio = {cfg.TICKERS[i]: round(float((signs[:, i] > 0).mean() * 100), 2)
                  for i in range(N)}
 
+    # Raw tanh output statistics per ETF
+    # High mean + low std = consistent conviction
+    # Low mean + high std = inconsistent / fluke
+    raw_outputs = signals[:, :N]
+    output_stats = {}
+    for i, ticker in enumerate(cfg.TICKERS):
+        vals = raw_outputs[:, i]
+        output_stats[ticker] = {
+            "mean":    round(float(vals.mean()), 4),
+            "std":     round(float(vals.std()), 4),
+            "min":     round(float(vals.min()), 4),
+            "max":     round(float(vals.max()), 4),
+            "pct_above_02":  round(float((vals > 0.2).mean() * 100), 2),   # % days clear BUY signal
+            "pct_below_m02": round(float((vals < -0.2).mean() * 100), 2),  # % days clear SHORT signal
+        }
+
     return {
         "metrics":           metrics,
         "bh_metrics":        bh_metrics,
         "avg_alloc_pct":     avg_alloc,
         "buy_ratio_pct":     buy_ratio,
+        "output_stats":      output_stats,
         "portfolio_values":  portfolio.tolist(),
         "bh_values":         bh.tolist(),
         "weight_file":       os.path.basename(weight_path),
