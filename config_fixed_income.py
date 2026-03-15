@@ -33,12 +33,12 @@ SEQ_LEN    = 96
 PRED_LEN   = 1
 LABEL_LEN  = 0
 BATCH_SIZE = 32
-EPOCHS     = 100
-LR         = 0.001
+EPOCHS     = 50
+LR         = 0.005
 GAMMA      = 10
 
 # Anti-collapse bias init
-OUTPUT_BIAS_INIT = 0.5
+OUTPUT_BIAS_INIT = 1.0
 
 # DLinear
 DLINEAR_INDIVIDUAL = False
@@ -51,6 +51,8 @@ CROSS_D_FF     = 128
 CROSS_SEG_LEN  = 12
 CROSS_WIN_SIZE = 2
 CROSS_DROPOUT  = 0.2
+
+USE_HOLD     = False  # disable Hold node — forces model to always trade
 
 FEATURE_COLS = ["Close", "Volume"]
 N_ASSETS     = len(TICKERS)
