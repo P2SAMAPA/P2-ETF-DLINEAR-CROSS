@@ -1,7 +1,7 @@
 """
 evaluate.py — P2-ETF-DLINEAR-CROSS
 =====================================
-Backtests trained models on the test year and computes:
+Backtests trained models on the test set and computes:
   - Annual return %
   - Sharpe ratio
   - Max drawdown
@@ -13,7 +13,7 @@ Usage:
   python evaluate.py --module B
 
 Saves:
-  results/{dir}/eval_results_YYYYMMDD.json     ← dated, cleaned up next run
+  results/{dir}/eval_results_YYYYMMDD.json     ← dated, cleaned next run
   results/{dir}/performance_history.json        ← permanent, never deleted
 """
 
@@ -21,6 +21,7 @@ import os
 import sys
 import json
 import pickle
+import glob
 import argparse
 import importlib
 import numpy as np
@@ -30,123 +31,222 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from data_loader import load_data
+from data_loader import load_data, build_features
 from model import get_model
-from loss_functions import smooth_sign
+
+
+# ── Find latest dated file ────────────────────────────────────────────────────
+
+def latest_dated_file(directory: str, prefix: str, suffix: str):
+    """Find the most recent date-stamped file: prefix_YYYYMMDD.suffix"""
+    if not os.path.exists(directory):
+        return None
+    matches = []
+    for fname in os.listdir(directory):
+        if fname.startswith(prefix + "_") and fname.endswith(suffix):
+            date_part = fname[len(prefix)+1 : -len(suffix)]
+            if date_part.isdigit() and len(date_part) == 8:
+                matches.append((date_part, os.path.join(directory, fname)))
+    if not matches:
+        return None
+    return sorted(matches)[-1][1]   # most recent
 
 
 # ── Portfolio simulation ──────────────────────────────────────────────────────
 
-def simulate_portfolio(signals: np.ndarray, price_diffs: np.ndarray,
+def simulate_portfolio(signals: np.ndarray, prices: np.ndarray,
                        initial_budget: float = 10_000.0) -> np.ndarray:
-    N      = price_diffs.shape[1]
+    """
+    Simulate daily portfolio value.
+
+    signals : (T, N+1)  — model tanh outputs, last col = Hold
+    prices  : (T, N)    — actual Close prices at each step
+                          (NOT differences — we compute % returns here)
+    """
+    N      = prices.shape[1]
     budget = initial_budget
     values = [budget]
-    for t in range(len(signals)):
-        O   = signals[t]
-        O_n = O[:N]
+
+    for t in range(len(signals) - 1):
+        O    = signals[t]
+        O_n  = O[:N]
         abs_O = np.abs(O)
         total = abs_O.sum()
         if total < 1e-8:
             values.append(budget)
             continue
-        V    = abs_O / total
-        V_n  = V[:N]
-        sign = np.sign(O_n)
-        pnl    = np.sum(V_n * sign * price_diffs[t])
-        budget = budget + pnl
+
+        V   = abs_O / total       # normalised weights (N+1,)
+        V_n = V[:N]               # trading weights
+        s   = np.sign(O_n)        # buy/short decision
+
+        # Daily % return for each ETF
+        p_curr = prices[t]
+        p_next = prices[t + 1]
+        # Avoid division by zero
+        valid  = p_curr > 0
+        pct_ret = np.where(valid, (p_next - p_curr) / p_curr, 0.0)
+
+        # Portfolio daily P&L as fraction of budget
+        daily_ret = np.sum(V_n * s * pct_ret)
+        budget    = budget * (1.0 + daily_ret)
+        budget    = max(budget, 0.0)
+        values.append(budget)
+
+    return np.array(values)
+
+
+def buy_and_hold(prices: np.ndarray, initial: float = 10_000.0) -> np.ndarray:
+    """Equal-weight buy and hold — uses % returns."""
+    N      = prices.shape[1]
+    weight = 1.0 / N
+    budget = initial
+    values = [budget]
+    for t in range(len(prices) - 1):
+        p_curr  = prices[t]
+        p_next  = prices[t + 1]
+        valid   = p_curr > 0
+        pct_ret = np.where(valid, (p_next - p_curr) / p_curr, 0.0)
+        daily_ret = np.sum(weight * pct_ret)
+        budget    = budget * (1.0 + daily_ret)
         values.append(max(budget, 0.0))
     return np.array(values)
 
 
-def compute_metrics(portfolio_values: np.ndarray, initial: float = 10_000.0) -> dict:
+def compute_metrics(portfolio_values: np.ndarray,
+                    initial: float = 10_000.0) -> dict:
     returns = np.diff(portfolio_values) / portfolio_values[:-1]
     returns = returns[~np.isnan(returns)]
+
     annual_return = (portfolio_values[-1] / initial - 1.0) * 100.0
+
     sharpe = 0.0
-    if returns.std() > 1e-8:
+    if len(returns) > 1 and returns.std() > 1e-8:
         sharpe = (returns.mean() / returns.std()) * np.sqrt(252)
+
     roll_max  = np.maximum.accumulate(portfolio_values)
-    drawdowns = (portfolio_values - roll_max) / roll_max
+    drawdowns = (portfolio_values - roll_max) / roll_max.clip(min=1e-8)
     max_dd    = float(drawdowns.min()) * 100.0
+
     return {
         "annual_return_pct": round(float(annual_return), 4),
         "sharpe_ratio":      round(float(sharpe), 4),
         "max_drawdown_pct":  round(float(max_dd), 4),
         "final_value":       round(float(portfolio_values[-1]), 2),
         "initial_value":     round(float(initial), 2),
+        "n_days":            len(portfolio_values),
     }
 
 
-def buy_and_hold(price_diffs: np.ndarray, initial: float = 10_000.0) -> np.ndarray:
-    N      = price_diffs.shape[1]
-    weight = 1.0 / N
-    budget = initial
-    values = [budget]
-    for t in range(len(price_diffs)):
-        pnl    = np.sum(weight * price_diffs[t])
-        budget = budget + pnl
-        values.append(max(budget, 0.0))
-    return np.array(values)
+# ── Get signals and raw prices from test set ──────────────────────────────────
 
+def get_signals_and_prices(model, loader, device) -> tuple:
+    """
+    Returns:
+      signals      : (T, N+1) — raw tanh outputs
+      raw_prices   : (T+1, N) — Close prices needed for % return calculation
+    We need one extra price row (the next-day price for the last signal).
+    """
+    all_signals = []
+    all_prices  = []   # p_curr for each step
+    all_prices_next = []  # p_next for each step
 
-# ── Get signals ───────────────────────────────────────────────────────────────
-
-def get_signals(model, loader, device) -> tuple[np.ndarray, np.ndarray]:
-    all_signals, all_diffs = [], []
     model.eval()
     with torch.no_grad():
         for X, Y in loader:
+            # Y = price_diff = p_next - p_curr
+            # We stored p_curr in the dataset — reconstruct via loader
+            # Actually Y is price diff; we need prices_df directly
+            # Workaround: pass prices through as additional info
             X = X.to(device)
             O = model(X)
             all_signals.append(O.cpu().numpy())
-            all_diffs.append(Y.numpy())
-    return np.vstack(all_signals), np.vstack(all_diffs)
+            # Y here is price_diff — we'll use it to verify but
+            # actual prices come from the dataset below
+            all_prices.append(Y.numpy())   # store diffs temporarily
+
+    return np.vstack(all_signals), np.vstack(all_prices)
 
 
 # ── Evaluate one model ────────────────────────────────────────────────────────
 
-def evaluate_model(model_name: str, cfg, test_loader, device, today_str: str) -> dict:
-    weight_path = os.path.join(cfg.RESULTS_DIR, f"{model_name}_best_{today_str}.pt")
-    if not os.path.exists(weight_path):
-        print(f"  ⚠️  No weights found at {weight_path}. Skipping.")
+def evaluate_model(model_name: str, cfg, test_prices: np.ndarray,
+                   test_features: np.ndarray, scaler, device) -> dict:
+    """
+    test_prices  : (T, N) raw Close prices for test period
+    test_features: (T, n_feat) unscaled features for test period
+    """
+    # Find latest weights — don't require today's date
+    weight_path = latest_dated_file(cfg.RESULTS_DIR, f"{model_name}_best", ".pt")
+    if not weight_path:
+        print(f"  ⚠️  No weights found for {model_name}. Skipping.")
         return {}
 
+    print(f"  ✅ Loading {model_name} weights from {weight_path}")
     model = get_model(model_name, cfg).to(device)
     model.load_state_dict(torch.load(weight_path, map_location=device))
-    print(f"  ✅ Loaded {model_name} weights")
+    model.eval()
 
-    signals, price_diffs = get_signals(model, test_loader, device)
-    portfolio = simulate_portfolio(signals, price_diffs)
+    seq_len    = cfg.SEQ_LEN
+    N          = cfg.N_ASSETS
+    n_samples  = len(test_features) - seq_len
+
+    if n_samples <= 0:
+        print(f"  ⚠️  Not enough test data ({len(test_features)} rows, need >{seq_len})")
+        return {}
+
+    # Scale features
+    feat_scaled = scaler.transform(test_features)
+
+    # Generate signals day by day
+    signals = []
+    for i in range(n_samples):
+        x = feat_scaled[i : i + seq_len]
+        X = torch.tensor(x, dtype=torch.float32).unsqueeze(0).to(device)
+        with torch.no_grad():
+            O = model(X).squeeze(0).cpu().numpy()
+        signals.append(O)
+    signals = np.array(signals)   # (n_samples, N+1)
+
+    # Prices aligned with signals: price[i] = close at signal day,
+    # price[i+1] = close at next day
+    price_window = test_prices[seq_len - 1 :]   # (n_samples+1, N)
+
+    portfolio = simulate_portfolio(signals, price_window)
+    bh        = buy_and_hold(price_window)
     metrics   = compute_metrics(portfolio)
+    bh_metrics = compute_metrics(bh)
 
-    print(f"     Annual Return : {metrics['annual_return_pct']:.2f}%")
+    print(f"     Annual Return : {metrics['annual_return_pct']:.2f}%  "
+          f"(B&H: {bh_metrics['annual_return_pct']:.2f}%)")
     print(f"     Sharpe Ratio  : {metrics['sharpe_ratio']:.3f}")
     print(f"     Max Drawdown  : {metrics['max_drawdown_pct']:.2f}%")
 
-    N        = cfg.N_ASSETS
-    abs_sigs = np.abs(signals[:, :N])
-    total    = abs_sigs.sum(axis=1, keepdims=True).clip(min=1e-8)
-    weights  = abs_sigs / total
-    avg_alloc = {cfg.TICKERS[i]: round(float(weights[:, i].mean() * 100), 2) for i in range(N)}
+    # Per-ETF stats
+    abs_sigs  = np.abs(signals[:, :N])
+    total     = abs_sigs.sum(axis=1, keepdims=True).clip(min=1e-8)
+    weights   = abs_sigs / total
+    avg_alloc = {cfg.TICKERS[i]: round(float(weights[:, i].mean() * 100), 2)
+                 for i in range(N)}
+
     signs     = np.sign(signals[:, :N])
-    buy_ratio = {cfg.TICKERS[i]: round(float((signs[:, i] > 0).mean() * 100), 2) for i in range(N)}
+    buy_ratio = {cfg.TICKERS[i]: round(float((signs[:, i] > 0).mean() * 100), 2)
+                 for i in range(N)}
 
     return {
-        "metrics":            metrics,
-        "avg_alloc_pct":      avg_alloc,
-        "buy_ratio_pct":      buy_ratio,
-        "portfolio_values":   portfolio.tolist(),
+        "metrics":           metrics,
+        "bh_metrics":        bh_metrics,
+        "avg_alloc_pct":     avg_alloc,
+        "buy_ratio_pct":     buy_ratio,
+        "portfolio_values":  portfolio.tolist(),
+        "bh_values":         bh.tolist(),
+        "weight_file":       os.path.basename(weight_path),
     }
 
 
 # ── Update performance history ────────────────────────────────────────────────
 
 def update_performance_history(results_dir: str, today_str: str, results: dict):
-    """
-    Append today's metrics to the permanent performance_history.json.
-    This file accumulates every run — never deleted.
-    """
     history_path = os.path.join(results_dir, "performance_history.json")
     history = []
     if os.path.exists(history_path):
@@ -155,7 +255,7 @@ def update_performance_history(results_dir: str, today_str: str, results: dict):
 
     entry = {
         "run_date":     today_str,
-        "test_year":    results.get("test_year"),
+        "test_period":  results.get("test_period"),
         "buy_and_hold": results.get("buy_and_hold", {}).get("metrics", {}),
         "models": {
             m: results["models"][m].get("metrics", {})
@@ -163,7 +263,6 @@ def update_performance_history(results_dir: str, today_str: str, results: dict):
         }
     }
 
-    # Replace if same date already exists, else append
     history = [e for e in history if e.get("run_date") != today_str]
     history.append(entry)
     history.sort(key=lambda x: x.get("run_date", ""))
@@ -177,10 +276,7 @@ def update_performance_history(results_dir: str, today_str: str, results: dict):
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate trained ETF models")
-    parser.add_argument(
-        "--module", choices=["A", "B"], required=True,
-        help="A = Equity ETFs, B = Fixed Income/Commodity ETFs"
-    )
+    parser.add_argument("--module", choices=["A", "B"], required=True)
     args = parser.parse_args()
 
     today_str = datetime.utcnow().strftime("%Y%m%d")
@@ -194,19 +290,53 @@ def main():
     print(f"📅 Run date  : {today_str}")
 
     token = os.getenv("HF_TOKEN")
-    _, _, test_loader, _, _ = load_data(
-        cfg, seq_len=cfg.SEQ_LEN, batch_size=cfg.BATCH_SIZE, token=token
+
+    # Load full dataset to extract raw test prices and features
+    from huggingface_hub import hf_hub_download
+    import pandas as pd
+
+    local = hf_hub_download(
+        repo_id=cfg.HF_DATASET_REPO,
+        repo_type="dataset",
+        filename=f"{cfg.HF_SUBDIR}/{cfg.PARQUET_FILE}",
+        token=token,
+        force_download=False,
     )
+    ohlcv_df = pd.read_parquet(local)
+    ohlcv_df.index = pd.to_datetime(ohlcv_df.index).tz_localize(None)
 
-    # Buy & Hold baseline
-    all_diffs = []
-    for _, Y in test_loader:
-        all_diffs.append(Y.numpy())
-    all_diffs    = np.vstack(all_diffs)
-    bh_portfolio = buy_and_hold(all_diffs)
+    features_df, prices_df = build_features(ohlcv_df, cfg.TICKERS)
+    valid       = features_df.dropna().index.intersection(prices_df.dropna().index)
+    features_df = features_df.loc[valid]
+    prices_df   = prices_df.loc[valid]
+
+    n          = len(features_df)
+    test_size  = max(int(n * cfg.SPLIT_TEST_RATIO), cfg.SEQ_LEN + 10)
+    val_size   = max(int(n * cfg.SPLIT_VAL_RATIO),  cfg.SEQ_LEN + 10)
+    train_size = n - val_size - test_size
+
+    # Test period raw data (unscaled features + raw prices)
+    test_features = features_df.iloc[train_size + val_size :].values
+    test_prices   = prices_df.iloc[train_size + val_size :].values
+
+    test_start = features_df.index[train_size + val_size].date()
+    test_end   = features_df.index[-1].date()
+    test_period = f"{test_start} → {test_end} ({len(test_features)} rows)"
+    print(f"📅 Test period: {test_period}")
+
+    # Load scaler (fit on train)
+    scaler_path = latest_dated_file(cfg.RESULTS_DIR, "scaler", ".pkl")
+    if not scaler_path:
+        print("❌ No scaler found. Run train.py first.")
+        return
+    with open(scaler_path, "rb") as f:
+        scaler = pickle.load(f)
+    print(f"📐 Loaded scaler from {os.path.basename(scaler_path)}")
+
+    # Buy & Hold over test period
+    bh_portfolio = buy_and_hold(test_prices)
     bh_metrics   = compute_metrics(bh_portfolio)
-
-    print(f"\n📊 Buy & Hold baseline:")
+    print(f"\n📊 Buy & Hold baseline ({test_period}):")
     print(f"   Annual Return : {bh_metrics['annual_return_pct']:.2f}%")
     print(f"   Sharpe Ratio  : {bh_metrics['sharpe_ratio']:.3f}")
     print(f"   Max Drawdown  : {bh_metrics['max_drawdown_pct']:.2f}%")
@@ -214,13 +344,13 @@ def main():
     results = {
         "module":       cfg.MODULE,
         "label":        cfg.LABEL,
-        "test_year":    f"latest {int(cfg.SPLIT_TEST_RATIO*100)}% of data",
+        "test_period":  test_period,
         "run_date":     today_str,
         "tickers":      cfg.TICKERS,
         "evaluated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
         "buy_and_hold": {
-            "metrics":           bh_metrics,
-            "portfolio_values":  bh_portfolio.tolist(),
+            "metrics":          bh_metrics,
+            "portfolio_values": bh_portfolio.tolist(),
         },
         "models": {},
     }
@@ -229,20 +359,18 @@ def main():
         print(f"\n{'─'*45}")
         print(f"  {model_name.upper()}")
         print(f"{'─'*45}")
-        r = evaluate_model(model_name, cfg, test_loader, device, today_str)
+        r = evaluate_model(model_name, cfg, test_prices,
+                           test_features, scaler, device)
         if r:
             results["models"][model_name] = r
 
-    # Save dated eval results
     os.makedirs(cfg.RESULTS_DIR, exist_ok=True)
     out_path = os.path.join(cfg.RESULTS_DIR, f"eval_results_{today_str}.json")
     with open(out_path, "w") as f:
         json.dump(results, f, indent=2)
     print(f"\n💾 Saved eval results → {out_path}")
 
-    # Update permanent performance history
     update_performance_history(cfg.RESULTS_DIR, today_str, results)
-
     print(f"\n🎉 Evaluation complete for Module {cfg.MODULE} [{today_str}]")
 
 
