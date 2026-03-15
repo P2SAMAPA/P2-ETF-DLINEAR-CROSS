@@ -30,45 +30,55 @@
     "run_date": "20260315",
     "test_period": "2023-03-30 \u2192 2026-03-13 (741 rows)",
     "buy_and_hold": {
-      "annual_return_pct": 77.6005,
-      "sharpe_ratio": 1.3193,
+      "total_return_pct": 64.4981,
+      "annual_return_pct": 21.4657,
+      "sharpe_ratio": 1.2837,
       "max_drawdown_pct": -18.214,
-      "final_value": 17760.05,
+      "final_value": 16449.81,
       "initial_value": 10000.0,
-      "n_days": 741
+      "n_days": 645,
+      "n_years": 2.56
     },
     "models": {
       "dlinear_prc": {
-        "annual_return_pct": 24.3479,
+        "total_return_pct": 24.3479,
+        "annual_return_pct": 8.9011,
         "sharpe_ratio": 0.4224,
         "max_drawdown_pct": -45.8584,
         "final_value": 12434.79,
         "initial_value": 10000.0,
-        "n_days": 645
+        "n_days": 644,
+        "n_years": 2.56
       },
       "crossformer_prc": {
-        "annual_return_pct": 24.3266,
+        "total_return_pct": 24.3267,
+        "annual_return_pct": 8.8939,
         "sharpe_ratio": 0.4221,
         "max_drawdown_pct": -45.9237,
-        "final_value": 12432.66,
+        "final_value": 12432.67,
         "initial_value": 10000.0,
-        "n_days": 645
+        "n_days": 644,
+        "n_years": 2.56
       },
       "dlinear_ret": {
-        "annual_return_pct": 269.0027,
+        "total_return_pct": 269.0029,
+        "annual_return_pct": 66.6791,
         "sharpe_ratio": 1.5906,
         "max_drawdown_pct": -22.4912,
-        "final_value": 36900.27,
+        "final_value": 36900.29,
         "initial_value": 10000.0,
-        "n_days": 645
+        "n_days": 644,
+        "n_years": 2.56
       },
       "crossformer_ret": {
-        "annual_return_pct": 241.665,
+        "total_return_pct": 241.6651,
+        "annual_return_pct": 61.7336,
         "sharpe_ratio": 1.5771,
         "max_drawdown_pct": -21.4016,
-        "final_value": 34166.5,
+        "final_value": 34166.51,
         "initial_value": 10000.0,
-        "n_days": 645
+        "n_days": 644,
+        "n_years": 2.56
       }
     }
   }

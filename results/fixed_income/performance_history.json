@@ -61,21 +61,21 @@
         "n_years": 2.33
       },
       "dlinear_ret": {
-        "total_return_pct": 268.9336,
+        "total_return_pct": 268.9337,
         "annual_return_pct": 75.3102,
         "sharpe_ratio": 1.5542,
         "max_drawdown_pct": -37.1496,
-        "final_value": 36893.36,
+        "final_value": 36893.37,
         "initial_value": 10000.0,
         "n_days": 586,
         "n_years": 2.33
       },
       "crossformer_ret": {
-        "total_return_pct": 260.8161,
+        "total_return_pct": 260.816,
         "annual_return_pct": 73.6409,
         "sharpe_ratio": 1.5512,
         "max_drawdown_pct": -36.5543,
-        "final_value": 36081.61,
+        "final_value": 36081.6,
         "initial_value": 10000.0,
         "n_days": 586,
         "n_years": 2.33
