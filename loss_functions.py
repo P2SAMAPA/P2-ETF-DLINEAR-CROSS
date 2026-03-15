@@ -107,43 +107,42 @@ def stockloss_max(O: torch.Tensor, prc: torch.Tensor,
 # ── Loss III: StockLoss-L2 (ACTIVE) ──────────────────────────────────────────
 
 def stockloss_l2(O: torch.Tensor, prc: torch.Tensor,
-                 gamma: float = 10.0, use_hold: bool = True) -> torch.Tensor:
+                 gamma: float = 10.0, use_hold: bool = False) -> torch.Tensor:
     """
     Loss III — StockLoss-L2 with PRC (price variant).
     *** ACTIVE LOSS FUNCTION FOR THIS PROJECT ***
 
-    Best-performing variant from the paper (Table 3).
-    Uses L2-norm over normalised price differences.
+    use_hold=False (default): O shape is (batch, N) — no Hold node
+    use_hold=True:            O shape is (batch, N+1) — last col is Hold
 
-    L = 1 - sqrt( Σ (V̂_i · (PRC_{i,t+1} - PRC_{i,t}) / max_j(...))² + H(V)² )
-
-    Args:
-        O   : model outputs (batch, N+1); last col = Hold node
-        prc : price differences (batch, N)  i.e. PRC_{t+1} - PRC_t
-        gamma     : smoothing coefficient for smooth_sign
-        use_hold  : whether to include Hold node
+    L = 1 - sqrt( Σ (V̂_i · norm_prc_i · sign_i)² [+ H²] )
     """
     N   = prc.shape[1]
-    O_n = O[:, :N]                          # (batch, N)
 
-    V   = portfolio_weights(O)[:, :N]       # (batch, N)
-    s   = smooth_sign(O_n, gamma)           # (batch, N)
-
-    # Normalise price differences by max absolute price diff in the batch window
-    max_prc = prc.abs().max(dim=1, keepdim=True).values.clamp(min=1e-8)
-    norm_prc = prc / max_prc                # (batch, N)
-
-    # Weighted normalised price term per asset
-    terms = (V * norm_prc * s) ** 2         # (batch, N)
-
-    hold_sq = torch.zeros(O.shape[0], device=O.device)
     if use_hold:
-        V_h = portfolio_weights(O)[:, N:]   # (batch, 1)
-        hold_sq = V_h.squeeze(1) ** 2
+        O_n = O[:, :N]
+        V   = portfolio_weights(O)[:, :N]
+        V_h = portfolio_weights(O)[:, N:]
+    else:
+        O_n = O                              # (batch, N)
+        # When no hold: weights = |O_i| / Σ|O_j|
+        abs_O = O_n.abs()
+        total = abs_O.sum(dim=1, keepdim=True).clamp(min=1e-8)
+        V     = abs_O / total
 
-    inside = terms.sum(dim=1) + hold_sq     # (batch,)
-    loss   = 1.0 - torch.sqrt(inside.clamp(min=1e-8))
+    s = smooth_sign(O_n, gamma)              # (batch, N)
 
+    # Normalise price diff by max in batch
+    max_prc  = prc.abs().max(dim=1, keepdim=True).values.clamp(min=1e-8)
+    norm_prc = prc / max_prc
+
+    terms  = (V * norm_prc * s) ** 2        # (batch, N)
+    inside = terms.sum(dim=1)
+
+    if use_hold:
+        inside = inside + V_h.squeeze(1) ** 2
+
+    loss = 1.0 - torch.sqrt(inside.clamp(min=1e-8))
     return loss.mean()
 
 
