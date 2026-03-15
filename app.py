@@ -185,11 +185,12 @@ def generate_signals(module: str, model_name: str,
     with torch.no_grad():
         O = model(X).squeeze(0).numpy()    # (N+1,)
 
-    N     = cfg.N_ASSETS
-    O_n   = O[:N]
-    abs_O = np.abs(O)
-    total = abs_O.sum()
-    alloc = (abs_O / total) * 100 if total > 1e-8 else np.zeros(N + 1)
+    use_hold = getattr(cfg, 'USE_HOLD', False)
+    N        = cfg.N_ASSETS
+    O_n      = O[:N]
+    abs_O_n  = np.abs(O_n)
+    total    = abs_O_n.sum()
+    alloc_n  = (abs_O_n / total) * 100 if total > 1e-8 else np.zeros(N)
 
     rows = []
     for i, ticker in enumerate(cfg.TICKERS):
@@ -198,14 +199,16 @@ def generate_signals(module: str, model_name: str,
             "Ticker":      ticker,
             "Raw Output":  round(float(O_n[i]), 4),
             "Signal":      signal,
-            "Allocation%": round(float(alloc[i]), 2),
+            "Allocation%": round(float(alloc_n[i]), 2),
         })
-    rows.append({
-        "Ticker":      "HOLD (cash)",
-        "Raw Output":  round(float(O[N]), 4),
-        "Signal":      "HOLD",
-        "Allocation%": round(float(alloc[N]), 2),
-    })
+    if use_hold and len(O) > N:
+        hold_alloc = abs(float(O[N])) / (abs_O_n.sum() + abs(float(O[N])) + 1e-8) * 100
+        rows.append({
+            "Ticker":      "HOLD (cash)",
+            "Raw Output":  round(float(O[N]), 4),
+            "Signal":      "HOLD",
+            "Allocation%": round(hold_alloc, 2),
+        })
 
     return pd.DataFrame(rows)
 
