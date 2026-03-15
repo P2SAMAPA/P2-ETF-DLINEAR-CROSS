@@ -51,51 +51,31 @@
         "n_years": 2.33
       },
       "crossformer_prc": {
-        "total_return_pct": 148.1973,
-        "annual_return_pct": 47.8346,
-        "sharpe_ratio": 2.0779,
-        "max_drawdown_pct": -13.4477,
-        "final_value": 24819.73,
+        "total_return_pct": 71.3595,
+        "annual_return_pct": 26.0632,
+        "sharpe_ratio": 1.9576,
+        "max_drawdown_pct": -7.3415,
+        "final_value": 17135.95,
         "initial_value": 10000.0,
         "n_days": 586,
         "n_years": 2.33
       },
       "dlinear_ret": {
-        "total_return_pct": 268.9339,
+        "total_return_pct": 268.9337,
         "annual_return_pct": 75.3102,
         "sharpe_ratio": 1.5542,
         "max_drawdown_pct": -37.1496,
-        "final_value": 36893.39,
+        "final_value": 36893.37,
         "initial_value": 10000.0,
         "n_days": 586,
         "n_years": 2.33
       },
       "crossformer_ret": {
-        "total_return_pct": 265.5171,
-        "annual_return_pct": 74.6102,
-        "sharpe_ratio": 1.5528,
-        "max_drawdown_pct": -36.9059,
-        "final_value": 36551.71,
-        "initial_value": 10000.0,
-        "n_days": 586,
-        "n_years": 2.33
-      },
-      "mole_prc": {
-        "total_return_pct": -62.3062,
-        "annual_return_pct": -34.2673,
-        "sharpe_ratio": -2.1571,
-        "max_drawdown_pct": -64.5551,
-        "final_value": 3769.38,
-        "initial_value": 10000.0,
-        "n_days": 586,
-        "n_years": 2.33
-      },
-      "mole_ret": {
-        "total_return_pct": 506.7457,
-        "annual_return_pct": 117.1299,
-        "sharpe_ratio": 2.0691,
-        "max_drawdown_pct": -23.8004,
-        "final_value": 60674.57,
+        "total_return_pct": 262.9605,
+        "annual_return_pct": 74.0839,
+        "sharpe_ratio": 1.552,
+        "max_drawdown_pct": -36.7088,
+        "final_value": 36296.05,
         "initial_value": 10000.0,
         "n_days": 586,
         "n_years": 2.33
