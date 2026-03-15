@@ -657,6 +657,43 @@ def main():
         metrics_df = pd.DataFrame(rows)
         st.dataframe(metrics_df, use_container_width=True, hide_index=True)
 
+        # ── Section 2b: Signal stability ─────────────────────────────────────
+        st.divider()
+        st.subheader("🎯 Signal Stability — How Often Each ETF Was Chosen")
+        st.caption(
+            "% of test days each ETF had BUY signal + avg allocation. "
+            "🎯 = strong conviction (>60% of days, >30% avg alloc) | "
+            "📊 = moderate | ❓ = inconsistent"
+        )
+
+        stab_cols = st.columns(4)
+        for col_idx, (variant, variant_label) in enumerate(VARIANTS):
+            with stab_cols[col_idx]:
+                st.markdown(f"**{variant_label}**")
+                model_metrics = models_data.get(variant, {})
+                alloc_pct     = model_metrics.get("avg_alloc_pct", {})
+                buy_ratio     = model_metrics.get("buy_ratio_pct", {})
+
+                if not alloc_pct:
+                    st.caption("No data yet")
+                    continue
+
+                # Sort by avg allocation, show top 3
+                top3 = sorted(alloc_pct.items(),
+                              key=lambda x: x[1], reverse=True)[:3]
+                for ticker, alloc in top3:
+                    buy_pct = buy_ratio.get(ticker, 0)
+                    if alloc > 30 and buy_pct > 60:
+                        icon = "🎯"
+                    elif alloc > 10 and buy_pct > 40:
+                        icon = "📊"
+                    else:
+                        icon = "❓"
+                    st.markdown(
+                        f"{icon} **{ticker}**: avg {alloc:.1f}% alloc | "
+                        f"BUY {buy_pct:.0f}% of days"
+                    )
+
         # ── Section 3: Portfolio value chart — all 4 variants + B&H ─────────
         st.divider()
         st.subheader("📈 Portfolio Value — All Models vs Buy & Hold")
