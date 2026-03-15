@@ -170,32 +170,13 @@ def compute_metrics(portfolio_values: np.ndarray,
 
 # ── Get signals and raw prices from test set ──────────────────────────────────
 
-def get_signals_and_prices(model, loader, device) -> tuple:
-    """
-    Returns:
-      signals      : (T, N+1) — raw tanh outputs
-      raw_prices   : (T+1, N) — Close prices needed for % return calculation
-    We need one extra price row (the next-day price for the last signal).
-    """
-    all_signals = []
-    all_prices  = []   # p_curr for each step
-    all_prices_next = []  # p_next for each step
-
-    model.eval()
-    with torch.no_grad():
-        for X, Y in loader:
-            # Y = price_diff = p_next - p_curr
-            # We stored p_curr in the dataset — reconstruct via loader
-            # Actually Y is price diff; we need prices_df directly
-            # Workaround: pass prices through as additional info
-            X = X.to(device)
-            O = model(X)
-            all_signals.append(O.cpu().numpy())
-            # Y here is price_diff — we'll use it to verify but
-            # actual prices come from the dataset below
-            all_prices.append(Y.numpy())   # store diffs temporarily
-
-    return np.vstack(all_signals), np.vstack(all_prices)
+def model_forward(model, X, ts_mark):
+    """Forward pass — passes ts_mark for MoLE, ignores for others."""
+    import inspect
+    sig = inspect.signature(model.forward)
+    if 'ts_mark' in sig.parameters:
+        return model(X, ts_mark)
+    return model(X)
 
 
 # ── Evaluate one model ────────────────────────────────────────────────────────
@@ -228,15 +209,29 @@ def evaluate_model(model_name: str, cfg, test_prices: np.ndarray,
     # Scale features
     feat_scaled = scaler.transform(test_features)
 
+    # Precompute timestamp features for test period
+    from data_loader import compute_timestamp_features
+    ts_feats = compute_timestamp_features(
+        pd.DatetimeIndex(
+            pd.date_range(
+                start=pd.Timestamp("2000-01-01"),
+                periods=len(test_features),
+                freq="B"
+            )
+        )
+    )
+
     # Generate signals day by day
     signals = []
     for i in range(n_samples):
-        x = feat_scaled[i : i + seq_len]
-        X = torch.tensor(x, dtype=torch.float32).unsqueeze(0).to(device)
+        x  = feat_scaled[i : i + seq_len]
+        ts = ts_feats[i]
+        X       = torch.tensor(x,  dtype=torch.float32).unsqueeze(0).to(device)
+        ts_mark = torch.tensor(ts, dtype=torch.float32).unsqueeze(0).to(device)
         with torch.no_grad():
-            O = model(X).squeeze(0).cpu().numpy()
+            O = model_forward(model, X, ts_mark).squeeze(0).cpu().numpy()
         signals.append(O)
-    signals = np.array(signals)   # (n_samples, N+1)
+    signals = np.array(signals)   # (n_samples, N or N+1)
 
     # Prices aligned with signals: price[i] = close at signal day,
     # price[i+1] = close at next day
