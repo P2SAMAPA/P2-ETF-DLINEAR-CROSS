@@ -392,6 +392,11 @@ def main():
     print(f"\n💾 Saved eval results → {out_path}")
 
     update_performance_history(cfg.RESULTS_DIR, today_str, results)
+
+    # Archive this run's results for paper comparison
+    from train import archive_results
+    archive_results(cfg, today_str)
+
     print(f"\n🎉 Evaluation complete for Module {cfg.MODULE} [{today_str}]")
 
 
