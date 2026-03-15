@@ -28,14 +28,32 @@
   },
   {
     "run_date": "20260315",
-    "test_year": "latest 10% of data",
+    "test_period": "2024-03-25 \u2192 2026-03-13 (494 rows)",
     "buy_and_hold": {
-      "annual_return_pct": 0.5179,
-      "sharpe_ratio": 0.9715,
-      "max_drawdown_pct": -0.392,
-      "final_value": 10051.79,
-      "initial_value": 10000.0
+      "annual_return_pct": 42.3687,
+      "sharpe_ratio": 1.1386,
+      "max_drawdown_pct": -18.214,
+      "final_value": 14236.87,
+      "initial_value": 10000.0,
+      "n_days": 494
     },
-    "models": {}
+    "models": {
+      "dlinear": {
+        "annual_return_pct": 30.4618,
+        "sharpe_ratio": 0.6447,
+        "max_drawdown_pct": -39.394,
+        "final_value": 13046.18,
+        "initial_value": 10000.0,
+        "n_days": 398
+      },
+      "crossformer": {
+        "annual_return_pct": 22.8579,
+        "sharpe_ratio": 0.5805,
+        "max_drawdown_pct": -34.0079,
+        "final_value": 12285.79,
+        "initial_value": 10000.0,
+        "n_days": 398
+      }
+    }
   }
 ]
