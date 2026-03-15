@@ -17,7 +17,7 @@ permissions:
 jobs:
   train_equity_transformer:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 240
 
     env:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
