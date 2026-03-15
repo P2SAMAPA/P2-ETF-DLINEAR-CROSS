@@ -208,43 +208,24 @@ def archive_results(cfg, today_str: str):
 
     # Write a phase README
     readme_path = os.path.join(archive_dir, "PHASE_INFO.md")
+    has_xes = "XES" in getattr(cfg, "TICKERS", [])
+    xes_note = "- XES included in equity universe" if has_xes else "- XES excluded from equity universe (Phase 3)"
+    lines_out = [
+        "# Archive: " + phase_label + " - Module " + cfg.MODULE,
+        "",
+        "**Run date**: " + today_str,
+        "**Epochs**: " + str(cfg.EPOCHS),
+        "**Test ratio**: " + str(cfg.SPLIT_TEST_RATIO),
+        "**Tickers**: " + str(cfg.TICKERS),
+        "**Loss function**: StockLoss-L2 (PRC + RET variants)",
+        "**Use Hold node**: " + str(getattr(cfg, "USE_HOLD", False)),
+        "**Files archived**: " + str(copied),
+        "",
+        "## Notes",
+        xes_note,
+    ]
     with open(readme_path, "w") as f:
-        f.write(f"# Archive: {phase_label} - Module {cfg.MODULE}
-
-")
-        f.write(f"**Run date**: {today_str}
-
-")
-        f.write(f"**Epochs**: {cfg.EPOCHS}
-
-")
-        f.write(f"**Test ratio**: {cfg.SPLIT_TEST_RATIO} ({int(cfg.SPLIT_TEST_RATIO*100)}%)
-
-")
-        f.write(f"**Val ratio**: {cfg.SPLIT_VAL_RATIO} ({int(cfg.SPLIT_VAL_RATIO*100)}%)
-
-")
-        f.write(f"**Tickers**: {cfg.TICKERS}
-
-")
-        f.write(f"**Loss function**: StockLoss-L2 (PRC + RET variants)
-
-")
-        f.write(f"**Use Hold node**: {getattr(cfg, 'USE_HOLD', False)}
-
-")
-        f.write(f"**Files archived**: {copied}
-
-")
-        f.write("## Notes
-
-")
-        if "XES" in cfg.TICKERS:
-            f.write("- XES included in equity universe
-")
-        else:
-            f.write("- XES **excluded** from equity universe (Phase 3)
-")
+        f.write("\n".join(lines_out))
 
     print(f"  📦 Archived {len(copied)} files → {archive_dir}")
     print(f"  📝 Phase info → {readme_path}")
