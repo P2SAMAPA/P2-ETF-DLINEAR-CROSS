@@ -28,47 +28,47 @@
   },
   {
     "run_date": "20260315",
-    "test_period": "2024-05-20 \u2192 2026-03-13 (455 rows)",
+    "test_period": "2023-06-23 \u2192 2026-03-13 (683 rows)",
     "buy_and_hold": {
-      "annual_return_pct": 35.9793,
-      "sharpe_ratio": 1.7221,
-      "max_drawdown_pct": -6.2717,
-      "final_value": 13597.93,
+      "annual_return_pct": 51.329,
+      "sharpe_ratio": 1.5592,
+      "max_drawdown_pct": -9.6383,
+      "final_value": 15132.9,
       "initial_value": 10000.0,
-      "n_days": 455
+      "n_days": 683
     },
     "models": {
       "dlinear_prc": {
-        "annual_return_pct": 88.2773,
-        "sharpe_ratio": 2.0547,
-        "max_drawdown_pct": -13.7628,
-        "final_value": 18827.73,
+        "annual_return_pct": 155.6985,
+        "sharpe_ratio": 2.0844,
+        "max_drawdown_pct": -13.8677,
+        "final_value": 25569.85,
         "initial_value": 10000.0,
-        "n_days": 359
+        "n_days": 587
       },
       "crossformer_prc": {
-        "annual_return_pct": 83.5485,
-        "sharpe_ratio": 2.0545,
-        "max_drawdown_pct": -12.9555,
-        "final_value": 18354.85,
+        "annual_return_pct": 66.6706,
+        "sharpe_ratio": 1.9016,
+        "max_drawdown_pct": -7.7798,
+        "final_value": 16667.06,
         "initial_value": 10000.0,
-        "n_days": 359
+        "n_days": 587
       },
       "dlinear_ret": {
-        "annual_return_pct": 147.8157,
-        "sharpe_ratio": 1.6791,
-        "max_drawdown_pct": -33.3444,
-        "final_value": 24781.57,
+        "annual_return_pct": 268.9336,
+        "sharpe_ratio": 1.5542,
+        "max_drawdown_pct": -37.1496,
+        "final_value": 36893.36,
         "initial_value": 10000.0,
-        "n_days": 359
+        "n_days": 587
       },
       "crossformer_ret": {
-        "annual_return_pct": 148.1784,
-        "sharpe_ratio": 1.6485,
-        "max_drawdown_pct": -35.2804,
-        "final_value": 24817.84,
+        "annual_return_pct": 260.8161,
+        "sharpe_ratio": 1.5512,
+        "max_drawdown_pct": -36.5543,
+        "final_value": 36081.61,
         "initial_value": 10000.0,
-        "n_days": 359
+        "n_days": 587
       }
     }
   }
