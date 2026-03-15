@@ -15,7 +15,7 @@ permissions:
 jobs:
   train_fixed_income:
     runs-on: ubuntu-latest
-    timeout-minutes: 120       # CPU training may take up to 2 hours
+    timeout-minutes: 180       # CPU training may take up to 2 hours
 
     env:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
