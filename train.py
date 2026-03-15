@@ -33,14 +33,23 @@ from loss_functions import get_loss_fn
 
 # ── Training one epoch ────────────────────────────────────────────────────────
 
+def model_forward(model, X, ts_mark):
+    """Forward pass — passes ts_mark for MoLE, ignores for others."""
+    import inspect
+    sig = inspect.signature(model.forward)
+    if 'ts_mark' in sig.parameters:
+        return model(X, ts_mark)
+    return model(X)
+
+
 def train_epoch(model, loader, optimizer, loss_fn, cfg, device, loss_type):
     model.train()
     total_loss = 0.0
-    for X, prc_diff, ret_diff in loader:
-        X        = X.to(device)
-        Y        = prc_diff.to(device) if loss_type == "PRC" else ret_diff.to(device)
+    for X, ts_mark, prc_diff, ret_diff in loader:
+        X, ts_mark = X.to(device), ts_mark.to(device)
+        Y          = prc_diff.to(device) if loss_type == "PRC" else ret_diff.to(device)
         optimizer.zero_grad()
-        O    = model(X)
+        O    = model_forward(model, X, ts_mark)
         loss = loss_fn(O, Y, gamma=cfg.GAMMA,
                        use_hold=getattr(cfg, 'USE_HOLD', False))
         loss.backward()
@@ -54,10 +63,10 @@ def eval_epoch(model, loader, loss_fn, cfg, device, loss_type):
     model.eval()
     total_loss = 0.0
     with torch.no_grad():
-        for X, prc_diff, ret_diff in loader:
-            X = X.to(device)
-            Y = prc_diff.to(device) if loss_type == "PRC" else ret_diff.to(device)
-            O    = model(X)
+        for X, ts_mark, prc_diff, ret_diff in loader:
+            X, ts_mark = X.to(device), ts_mark.to(device)
+            Y          = prc_diff.to(device) if loss_type == "PRC" else ret_diff.to(device)
+            O    = model_forward(model, X, ts_mark)
             loss = loss_fn(O, Y, gamma=cfg.GAMMA,
                            use_hold=getattr(cfg, 'USE_HOLD', False))
             total_loss += loss.item()
@@ -236,6 +245,11 @@ def archive_results(cfg, today_str: str):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--module", choices=["A", "B"], required=True)
+    parser.add_argument(
+        "--variants", nargs="*", default=None,
+        help="Subset of variants e.g. --variants dlinear_prc dlinear_ret. "
+             "If omitted trains all variants in config."
+    )
     args = parser.parse_args()
 
     today_str = datetime.utcnow().strftime("%Y%m%d")
@@ -243,10 +257,24 @@ def main():
     cfg       = importlib.import_module(cfg_map[args.module])
     device    = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    print(f"\n🖥  Device   : {device}")
-    print(f"📦 Module   : {cfg.MODULE} — {cfg.LABEL}")
-    print(f"📅 Run date : {today_str}")
-    print(f"🔢 Variants : {cfg.MODEL_VARIANTS}")
+    # Filter variants if --variants specified
+    all_variants = cfg.MODEL_VARIANTS
+    if args.variants:
+        requested    = set(args.variants)
+        all_variants = [
+            (arch, loss_v, loss_t)
+            for arch, loss_v, loss_t in cfg.MODEL_VARIANTS
+            if f"{arch}_{loss_t.lower()}" in requested
+        ]
+        if not all_variants:
+            print(f"No matching variants for {args.variants}")
+            print(f"Available: {[f'{a}_{t.lower()}' for a,v,t in cfg.MODEL_VARIANTS]}")
+            return
+
+    print(f"\nDevice   : {device}")
+    print(f"Module   : {cfg.MODULE} - {cfg.LABEL}")
+    print(f"Run date : {today_str}")
+    print(f"Variants : {all_variants}")
 
     token = os.getenv("HF_TOKEN")
     train_loader, val_loader, test_loader, n_features, scaler = load_data(
@@ -256,8 +284,8 @@ def main():
     os.makedirs(cfg.RESULTS_DIR, exist_ok=True)
     cleanup_old_files(cfg.RESULTS_DIR, today_str)
 
-    # Train all variants
-    for arch, loss_variant, loss_type in cfg.MODEL_VARIANTS:
+    # Train selected variants
+    for arch, loss_variant, loss_type in all_variants:
         result = train_variant(arch, loss_type, cfg,
                                train_loader, val_loader, device)
         save_variant(arch, loss_type, result, cfg, today_str)
@@ -266,8 +294,8 @@ def main():
     scaler_path = os.path.join(cfg.RESULTS_DIR, f"scaler_{today_str}.pkl")
     with open(scaler_path, "wb") as f:
         pickle.dump(scaler, f)
-    print(f"\n📐 Saved scaler → {scaler_path}")
-    print(f"\n🎉 All variants trained for Module {cfg.MODULE} [{today_str}]")
+    print(f"\nSaved scaler -> {scaler_path}")
+    print(f"\nAll variants trained for Module {cfg.MODULE} [{today_str}]")
 
 
 if __name__ == "__main__":
