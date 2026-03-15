@@ -1,0 +1,69 @@
+# evaluate_only.yml — P2-ETF-DLINEAR-CROSS
+# Run evaluation only (no retraining) to regenerate eval_results JSON
+# with latest evaluate.py changes (single ETF B&H, output_stats etc.)
+# Use when evaluate.py has been updated but models don't need retraining.
+
+name: Evaluate Only (no retraining)
+
+on:
+  workflow_dispatch:
+    inputs:
+      module:
+        description: "Module to evaluate: A (equity), B (fixed income), or both"
+        required: true
+        default: "both"
+        type: choice
+        options:
+          - both
+          - A
+          - B
+
+permissions:
+  contents: write
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Evaluate Module A (Equity)
+        if: ${{ github.event.inputs.module == 'both' || github.event.inputs.module == 'A' }}
+        run: python evaluate.py --module A
+
+      - name: Evaluate Module B (Fixed Income)
+        if: ${{ github.event.inputs.module == 'both' || github.event.inputs.module == 'B' }}
+        run: python evaluate.py --module B
+
+      - name: Commit updated eval results
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add results/equity/ results/fixed_income/ results/archive/
+          git stash
+          git pull --rebase origin main
+          git stash pop
+          git add results/equity/ results/fixed_income/ results/archive/
+          git diff --staged --quiet || git commit -m "chore: regenerate eval results with latest evaluate.py [$(date -u '+%Y-%m-%d %H:%M UTC')]"
+          git push
+
+      - name: Log completion
+        run: echo "✅ Evaluation complete at $(date -u)"
