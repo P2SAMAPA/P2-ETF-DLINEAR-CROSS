@@ -598,7 +598,7 @@ def main():
         st.subheader("🎯 Next-Day Top 2 Signals — All Models")
         st.caption("Top 2 ETFs by allocation % for each model variant")
 
-        sig_cols = st.columns(4)
+        sig_cols = st.columns(len(VARIANTS))
         for col_idx, (variant, variant_label) in enumerate(VARIANTS):
             with sig_cols[col_idx]:
                 st.markdown(f"**{variant_label}**")
@@ -753,7 +753,7 @@ It looks at three things across all test days:
 - `❓ XES: 48% avg alloc | BUY 55% of days | raw μ=0.21 σ=0.38` → Likely a fluke. The model is barely above the BUY threshold on average and very inconsistent. Today's 100% reading is an outlier.
             """)
 
-        stab_cols = st.columns(4)
+        stab_cols = st.columns(len(VARIANTS))
         for col_idx, (variant, variant_label) in enumerate(VARIANTS):
             with stab_cols[col_idx]:
                 st.markdown(f"**{variant_label}**")
