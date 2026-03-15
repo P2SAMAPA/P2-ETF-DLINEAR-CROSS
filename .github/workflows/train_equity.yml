@@ -15,7 +15,7 @@ permissions:
 jobs:
   train_equity:
     runs-on: ubuntu-latest
-    timeout-minutes: 240       # CPU training may take up to 2 hours
+    timeout-minutes: 300       # CPU training may take up to 2 hours
 
     env:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -47,10 +47,12 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add results/equity/
+          git add results/archive/
           git stash
           git pull --rebase origin main
           git stash pop
           git add results/equity/
+          git add results/archive/
           git diff --staged --quiet || git commit -m "chore: update equity model results [$(date -u '+%Y-%m-%d %H:%M UTC')]"
           git push
 
