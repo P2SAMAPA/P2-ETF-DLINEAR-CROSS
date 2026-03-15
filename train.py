@@ -170,6 +170,86 @@ def save_variant(arch: str, loss_type: str, result: dict,
     print(f"  📝 {meta_path}")
 
 
+# ── Archive snapshot ─────────────────────────────────────────────────────────
+
+def get_phase_label(cfg) -> str:
+    """
+    Auto-generate a phase label from config settings.
+    Used to name the archive folder.
+    e.g. "phase2a_ep50_test10_withXES" or "phase3_ep300_test15_noXES"
+    """
+    epochs    = cfg.EPOCHS
+    test_pct  = int(cfg.SPLIT_TEST_RATIO * 100)
+    has_xes   = "XES" in cfg.TICKERS if hasattr(cfg, 'TICKERS') else True
+    xes_label = "withXES" if has_xes else "noXES"
+    return f"ep{epochs}_test{test_pct}_{xes_label}"
+
+
+def archive_results(cfg, today_str: str):
+    """
+    Copy today's dated result files into results/archive/{phase_label}/
+    so they are preserved when the next phase overwrites the main results folder.
+    Copies: eval_results, all variant metas, scaler meta (not .pt weights — too large)
+    """
+    import shutil
+    phase_label  = get_phase_label(cfg)
+    module_label = f"module_{cfg.MODULE}"
+    archive_dir  = os.path.join("results", "archive", phase_label, module_label)
+    os.makedirs(archive_dir, exist_ok=True)
+
+    copied = []
+    for fname in os.listdir(cfg.RESULTS_DIR):
+        # Archive JSON files and pkl (small) — skip .pt weight files (large)
+        if fname.endswith(".json") or fname == f"scaler_{today_str}.pkl":
+            src = os.path.join(cfg.RESULTS_DIR, fname)
+            dst = os.path.join(archive_dir, fname)
+            shutil.copy2(src, dst)
+            copied.append(fname)
+
+    # Write a phase README
+    readme_path = os.path.join(archive_dir, "PHASE_INFO.md")
+    with open(readme_path, "w") as f:
+        f.write(f"# Archive: {phase_label} — Module {cfg.MODULE}
+
+")
+        f.write(f"**Run date**: {today_str}
+
+")
+        f.write(f"**Epochs**: {cfg.EPOCHS}
+
+")
+        f.write(f"**Test ratio**: {cfg.SPLIT_TEST_RATIO} ({int(cfg.SPLIT_TEST_RATIO*100)}%)
+
+")
+        f.write(f"**Val ratio**: {cfg.SPLIT_VAL_RATIO} ({int(cfg.SPLIT_VAL_RATIO*100)}%)
+
+")
+        f.write(f"**Tickers**: {cfg.TICKERS}
+
+")
+        f.write(f"**Loss function**: StockLoss-L2 (PRC + RET variants)
+
+")
+        f.write(f"**Use Hold node**: {getattr(cfg, 'USE_HOLD', False)}
+
+")
+        f.write(f"**Files archived**: {copied}
+
+")
+        f.write("## Notes
+
+")
+        if "XES" in cfg.TICKERS:
+            f.write("- XES included in equity universe
+")
+        else:
+            f.write("- XES **excluded** from equity universe (Phase 3)
+")
+
+    print(f"  📦 Archived {len(copied)} files → {archive_dir}")
+    print(f"  📝 Phase info → {readme_path}")
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
