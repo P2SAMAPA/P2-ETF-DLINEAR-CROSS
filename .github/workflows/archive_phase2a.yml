@@ -1,0 +1,56 @@
+# archive_phase2a.yml — P2-ETF-DLINEAR-CROSS
+# ONE-TIME manual workflow to archive Phase 2a results
+# (50 epochs, test=0.10, with XES) before the 300-epoch run overwrites them.
+#
+# Run this IMMEDIATELY — before the current 300-epoch training completes.
+# After this runs successfully, this workflow file can be ignored.
+
+name: Archive Phase 2a Results (ONE-TIME)
+
+on:
+  workflow_dispatch:    # manual trigger only
+
+permissions:
+  contents: write
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Archive Phase 2a results
+        run: python archive_current.py
+
+      - name: Commit archive to repo
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add results/archive/
+          git stash
+          git pull --rebase origin main
+          git stash pop
+          git add results/archive/
+          git diff --staged --quiet || git commit -m "Archive Phase 2a results (ep50_test10_withXES) [$(date -u '+%Y-%m-%d %H:%M UTC')]"
+          git push
+
+      - name: Log completion
+        run: echo "✅ Phase 2a archive complete at $(date -u)"
