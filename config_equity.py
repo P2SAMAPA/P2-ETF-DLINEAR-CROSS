@@ -29,7 +29,7 @@ START_DATE = "2006-01-01"
 #
 # These are computed in data_loader.py using row counts, not calendar years.
 # SPLIT_RATIOS drives the split — do not use TEST_YEAR/VAL_YEAR for splitting.
-SPLIT_TEST_RATIO  = 0.10
+SPLIT_TEST_RATIO  = 0.15
 SPLIT_VAL_RATIO   = 0.10
 # Train ratio = 1 - test - val = 0.80 (implicit)
 
@@ -43,7 +43,7 @@ SEQ_LEN    = 96
 PRED_LEN   = 1
 LABEL_LEN  = 0
 BATCH_SIZE = 32
-EPOCHS     = 50   # faster iterations while tuning
+EPOCHS     = 300
 LR         = 0.005  # higher LR to escape hold-collapse
 GAMMA      = 10
 
