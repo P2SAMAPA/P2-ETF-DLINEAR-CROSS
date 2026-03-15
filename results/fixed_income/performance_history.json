@@ -25,5 +25,35 @@
         "initial_value": 10000.0
       }
     }
+  },
+  {
+    "run_date": "20260315",
+    "test_period": "2024-05-20 \u2192 2026-03-13 (455 rows)",
+    "buy_and_hold": {
+      "annual_return_pct": 35.9793,
+      "sharpe_ratio": 1.7221,
+      "max_drawdown_pct": -6.2717,
+      "final_value": 13597.93,
+      "initial_value": 10000.0,
+      "n_days": 455
+    },
+    "models": {
+      "dlinear": {
+        "annual_return_pct": 86.8444,
+        "sharpe_ratio": 2.0757,
+        "max_drawdown_pct": -13.158,
+        "final_value": 18684.44,
+        "initial_value": 10000.0,
+        "n_days": 359
+      },
+      "crossformer": {
+        "annual_return_pct": 78.5972,
+        "sharpe_ratio": 2.0531,
+        "max_drawdown_pct": -12.4234,
+        "final_value": 17859.72,
+        "initial_value": 10000.0,
+        "n_days": 359
+      }
+    }
   }
 ]
