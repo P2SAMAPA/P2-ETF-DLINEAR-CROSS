@@ -212,10 +212,12 @@ def evaluate_model(model_name: str, cfg, test_prices: np.ndarray,
     feat_scaled = scaler.transform(test_features)
 
     # Precompute timestamp features for test period using actual test dates
-    from data_loader import compute_timestamp_features, build_features
-    # Rebuild the actual test index from the loaded data
-    test_start_idx = train_size + val_size
-    actual_test_index = features_df.index[test_start_idx:test_start_idx + len(test_features)]
+    from data_loader import compute_timestamp_features
+    n = len(features_df)
+    _test_size = max(int(n * cfg.SPLIT_TEST_RATIO), seq_len + 10)
+    _val_size  = max(int(n * cfg.SPLIT_VAL_RATIO),  seq_len + 10)
+    _train_size = n - _val_size - _test_size
+    actual_test_index = features_df.index[_train_size + _val_size : _train_size + _val_size + len(test_features)]
     ts_feats = compute_timestamp_features(pd.DatetimeIndex(actual_test_index))
 
     # Generate signals day by day
