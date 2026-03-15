@@ -184,10 +184,12 @@ def model_forward(model, X, ts_mark):
 # ── Evaluate one model ────────────────────────────────────────────────────────
 
 def evaluate_model(model_name: str, cfg, test_prices: np.ndarray,
-                   test_features: np.ndarray, scaler, device) -> dict:
+                   test_features: np.ndarray, scaler, device,
+                   test_dates=None) -> dict:
     """
     test_prices  : (T, N) raw Close prices for test period
     test_features: (T, n_feat) unscaled features for test period
+    test_dates   : DatetimeIndex for test period (for MoLE ts_mark)
     """
     # Find latest weights — don't require today's date
     weight_path = latest_dated_file(cfg.RESULTS_DIR, f"{model_name}_best", ".pt")
@@ -213,12 +215,13 @@ def evaluate_model(model_name: str, cfg, test_prices: np.ndarray,
 
     # Precompute timestamp features for test period using actual test dates
     from data_loader import compute_timestamp_features
-    n = len(features_df)
-    _test_size = max(int(n * cfg.SPLIT_TEST_RATIO), seq_len + 10)
-    _val_size  = max(int(n * cfg.SPLIT_VAL_RATIO),  seq_len + 10)
-    _train_size = n - _val_size - _test_size
-    actual_test_index = features_df.index[_train_size + _val_size : _train_size + _val_size + len(test_features)]
-    ts_feats = compute_timestamp_features(pd.DatetimeIndex(actual_test_index))
+    if test_dates is not None:
+        ts_feats = compute_timestamp_features(pd.DatetimeIndex(test_dates[:len(test_features)]))
+    else:
+        # Fallback: synthetic dates (MoLE router will be less accurate)
+        ts_feats = compute_timestamp_features(
+            pd.DatetimeIndex(pd.date_range("2020-01-01", periods=len(test_features), freq="B"))
+        )
 
     # Generate signals day by day
     signals = []
@@ -373,6 +376,7 @@ def main():
     # Test period raw data (unscaled features + raw prices)
     test_features = features_df.iloc[train_size + val_size :].values
     test_prices   = prices_df.iloc[train_size + val_size :].values
+    test_dates    = features_df.index[train_size + val_size :]   # actual dates for MoLE ts_mark
 
     test_start = features_df.index[train_size + val_size].date()
     test_end   = features_df.index[-1].date()
@@ -423,7 +427,8 @@ def main():
         print(f"  {variant_name.upper()}")
         print(f"{'─'*45}")
         r = evaluate_model(variant_name, cfg, test_prices,
-                           test_features, scaler, device)
+                           test_features, scaler, device,
+                           test_dates=test_dates)
         if r:
             results["models"][variant_name] = r
 
