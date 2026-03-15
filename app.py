@@ -371,15 +371,11 @@ def main():
             "crossformer_prc",
             "dlinear_ret",
             "crossformer_ret",
-            "mole_prc",
-            "mole_ret",
         ], format_func=lambda x: {
             "dlinear_prc":     "DLinear + Price Loss (PRC)",
             "crossformer_prc": "Crossformer + Price Loss (PRC)",
             "dlinear_ret":     "DLinear + Return Loss (RET)",
             "crossformer_ret": "Crossformer + Return Loss (RET)",
-            "mole_prc":        "MoLE-DLinear + Price Loss (PRC) 🆕",
-            "mole_ret":        "MoLE-DLinear + Return Loss (RET) 🆕",
         }.get(x, x))
 
         st.divider()
@@ -586,8 +582,6 @@ def main():
             ("crossformer_prc", "Crossformer + PRC"),
             ("dlinear_ret",     "DLinear + RET"),
             ("crossformer_ret", "Crossformer + RET"),
-            ("mole_prc",        "MoLE-DLinear + PRC 🆕"),
-            ("mole_ret",        "MoLE-DLinear + RET 🆕"),
         ]
 
         hf_meta_sum  = load_hf_metadata(sum_module)
@@ -791,6 +785,55 @@ It looks at three things across all test days:
                     if mean_out is not None:
                         line += f" | raw μ={mean_out:.2f} σ={std_out:.2f}"
                     st.markdown(line)
+
+        # ── Section 2c: Walk-forward MoLE results ────────────────────────────
+        wf_path = os.path.join(cfg.RESULTS_DIR,
+                               sorted([f for f in os.listdir(cfg.RESULTS_DIR)
+                                       if f.startswith("mole_ret_walkforward_")
+                                       and f.endswith(".json")],
+                                      reverse=True)[0])                   if any(f.startswith("mole_ret_walkforward_")
+                         for f in os.listdir(cfg.RESULTS_DIR)) else None
+
+        if wf_path:
+            st.divider()
+            st.subheader("🔄 MoLE-DLinear + RET — Walk-Forward Backtest")
+            st.caption(
+                "Walk-forward: 3yr train + 1yr val + 1yr test rolling windows. "
+                "Each prediction is fully out-of-sample. "
+                "Results concatenated into one continuous equity curve."
+            )
+            with open(wf_path) as f:
+                wf_data = json.load(f)
+            wf_metrics = wf_data.get("metrics", {})
+            wf_cols = st.columns(4)
+            wf_cols[0].metric("Total Return",
+                              f"{wf_metrics.get('total_return_pct', 0):.2f}%")
+            wf_cols[1].metric("CAGR",
+                              f"{wf_metrics.get('annual_return_pct', 0):.2f}%")
+            wf_cols[2].metric("Sharpe",
+                              f"{wf_metrics.get('sharpe_ratio', 0):.4f}")
+            wf_cols[3].metric("Max Drawdown",
+                              f"{wf_metrics.get('max_drawdown_pct', 0):.2f}%")
+
+            # Last signal
+            ls = wf_data.get("last_signal", {})
+            if ls:
+                direction = ls.get("direction", "")
+                ticker    = ls.get("ticker", "")
+                raw_val   = ls.get("raw_value", 0)
+                color     = "green" if direction == "BUY" else "red"
+                st.markdown(
+                    f"**Next-Day Signal:** "
+                    f":{color}[{ticker} {direction}] "
+                    f"({abs(raw_val)*100:.1f}% allocated)"
+                )
+
+            # Fold summary
+            with st.expander(f"📋 Fold Summary ({wf_data.get('n_folds_ok', 0)} folds)", expanded=False):
+                fold_rows = wf_data.get("fold_summary", [])
+                if fold_rows:
+                    fold_df = pd.DataFrame(fold_rows)
+                    st.dataframe(fold_df, use_container_width=True, hide_index=True)
 
         # ── Section 3: Portfolio value chart — all 4 variants + B&H ─────────
         st.divider()
