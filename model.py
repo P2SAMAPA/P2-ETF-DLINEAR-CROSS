@@ -277,5 +277,145 @@ def get_model(model_name: str, cfg) -> nn.Module:
             bias_init  = bias_init,
             use_hold   = use_hold,
         )
+    elif arch == "mole":
+        n_heads      = getattr(cfg, 'MOLE_N_HEADS', 4)
+        head_dropout = getattr(cfg, 'MOLE_HEAD_DROPOUT', 0.0)
+        return MoLEDLinear(
+            seq_len      = cfg.SEQ_LEN,
+            n_features   = n_feat,
+            n_assets     = n_assets,
+            n_heads      = n_heads,
+            ts_dim       = 4,
+            individual   = cfg.DLINEAR_INDIVIDUAL,
+            bias_init    = bias_init,
+            use_hold     = use_hold,
+            head_dropout = head_dropout,
+        )
     else:
-        raise ValueError(f"Unknown model arch: '{arch}' (from '{model_name}'). Choose 'dlinear' or 'crossformer'.")
+        raise ValueError(f"Unknown model arch: '{arch}' (from '{model_name}'). Choose 'dlinear', 'crossformer', or 'mole'.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Model 3: MoLE-DLinear
+# ══════════════════════════════════════════════════════════════════════════════
+
+class MoLEDLinear(nn.Module):
+    """
+    Mixture-of-Linear-Experts applied to DLinear for ETF trading.
+    Based on: Ni et al. (2024) "Mixture-of-Linear-Experts for Long-term
+    Time Series Forecasting" (AISTATS 2024)
+
+    Architecture:
+      - n_heads DLinear experts trained in parallel
+      - A 2-layer MLP router that takes the start-of-window timestamp
+        embedding (4 features: day_of_week, day_of_month, month, quarter)
+        and outputs per-channel weights for each expert
+      - Final output = weighted sum of expert outputs
+
+    Input  : X (batch, seq_len, n_features), ts_mark (batch, 4)
+    Output : (batch, N+1) — tanh-bounded trading decisions
+    """
+    def __init__(self, seq_len: int, n_features: int, n_assets: int,
+                 n_heads: int = 4, ts_dim: int = 4,
+                 individual: bool = False, kernel_size: int = 25,
+                 bias_init: float = 1.0, use_hold: bool = False,
+                 head_dropout: float = 0.0):
+        super().__init__()
+        self.n_heads      = n_heads
+        self.n_assets     = n_assets
+        self.head_dropout = head_dropout
+
+        # n_heads DLinear experts (without their own TradingHead)
+        self.experts = nn.ModuleList([
+            _DLinearBackbone(seq_len, n_features, individual, kernel_size)
+            for _ in range(n_heads)
+        ])
+
+        # Shared trading head over mixed output
+        self.head = TradingHead(n_features, n_assets, bias_init, use_hold)
+
+        # Router MLP: ts_dim → hidden → (n_assets+1) * n_heads
+        # Channel-specific weights per head as in MoLE paper
+        n_out_neurons = (n_assets + 1 if use_hold else n_assets)
+        self.router = nn.Sequential(
+            nn.Linear(ts_dim, ts_dim * 4),
+            nn.ReLU(),
+            nn.Linear(ts_dim * 4, n_out_neurons * n_heads),
+        )
+        self.n_out_neurons = n_out_neurons
+
+    def forward(self, x: torch.Tensor,
+                ts_mark: torch.Tensor | None = None) -> torch.Tensor:
+        """
+        x       : (batch, seq_len, n_features)
+        ts_mark : (batch, 4) timestamp embedding — if None, equal weights
+        """
+        B = x.shape[0]
+
+        # Get outputs from all experts: each is (batch, n_features)
+        expert_outs = torch.stack(
+            [expert(x) for expert in self.experts], dim=1
+        )   # (batch, n_heads, n_features)
+
+        # Router weights
+        if ts_mark is not None:
+            # (batch, n_out_neurons * n_heads) → (batch, n_heads, n_out_neurons)
+            raw_weights = self.router(ts_mark).view(B, self.n_heads, self.n_out_neurons)
+
+            # Head dropout during training (regularisation from MoLE paper)
+            if self.training and self.head_dropout > 0:
+                mask = torch.bernoulli(
+                    torch.ones(B, self.n_heads, 1, device=x.device) * (1 - self.head_dropout)
+                )
+                raw_weights = raw_weights * mask
+
+            # Softmax over heads per output neuron
+            weights = torch.softmax(raw_weights, dim=1)   # (batch, n_heads, n_out_neurons)
+        else:
+            # Equal weights fallback
+            weights = torch.ones(B, self.n_heads, self.n_out_neurons,
+                                 device=x.device) / self.n_heads
+
+        # Mix expert outputs: weighted sum over heads
+        # expert_outs: (batch, n_heads, n_features)
+        # weights    : (batch, n_heads, n_out_neurons) — channel-specific
+        # We apply weights to the final trading head outputs per expert
+
+        # Get per-expert trading decisions first
+        expert_decisions = torch.stack(
+            [self.head(expert_outs[:, i, :]) for i in range(self.n_heads)], dim=1
+        )   # (batch, n_heads, n_out_neurons)
+
+        # Channel-wise weighted sum
+        mixed = (expert_decisions * weights).sum(dim=1)   # (batch, n_out_neurons)
+
+        # Apply tanh to final mixed output
+        return torch.tanh(mixed)
+
+
+class _DLinearBackbone(nn.Module):
+    """DLinear without the TradingHead — outputs raw feature vector."""
+    def __init__(self, seq_len: int, n_features: int,
+                 individual: bool = False, kernel_size: int = 25):
+        super().__init__()
+        self.seq_len    = seq_len
+        self.n_features = n_features
+        self.individual = individual
+        self.decomp     = MovingAvgDecomposition(kernel_size)
+
+        if individual:
+            self.linear_seasonal = nn.ModuleList([nn.Linear(seq_len, 1) for _ in range(n_features)])
+            self.linear_trend    = nn.ModuleList([nn.Linear(seq_len, 1) for _ in range(n_features)])
+        else:
+            self.linear_seasonal = nn.Linear(seq_len, 1)
+            self.linear_trend    = nn.Linear(seq_len, 1)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        seasonal, trend = self.decomp(x)
+        if self.individual:
+            s_out = torch.stack([self.linear_seasonal[i](seasonal[:, :, i]) for i in range(self.n_features)], dim=-1)
+            t_out = torch.stack([self.linear_trend[i](trend[:, :, i])       for i in range(self.n_features)], dim=-1)
+        else:
+            s_out = self.linear_seasonal(seasonal.permute(0, 2, 1)).permute(0, 2, 1)
+            t_out = self.linear_trend(trend.permute(0, 2, 1)).permute(0, 2, 1)
+        return (s_out + t_out).squeeze(1)   # (batch, n_features)
