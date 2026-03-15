@@ -1,0 +1,75 @@
+[
+  {
+    "run_date": "20260314",
+    "test_year": "latest 10% of data",
+    "buy_and_hold": {
+      "annual_return_pct": 0.3408,
+      "sharpe_ratio": 1.4814,
+      "max_drawdown_pct": -0.1292,
+      "final_value": 10034.08,
+      "initial_value": 10000.0
+    },
+    "models": {
+      "dlinear": {
+        "annual_return_pct": 0.0003,
+        "sharpe_ratio": 0.9068,
+        "max_drawdown_pct": -0.0001,
+        "final_value": 10000.03,
+        "initial_value": 10000.0
+      },
+      "crossformer": {
+        "annual_return_pct": -0.0008,
+        "sharpe_ratio": -0.9263,
+        "max_drawdown_pct": -0.0014,
+        "final_value": 9999.92,
+        "initial_value": 10000.0
+      }
+    }
+  },
+  {
+    "run_date": "20260315",
+    "test_period": "2023-06-23 \u2192 2026-03-13 (683 rows)",
+    "buy_and_hold": {
+      "annual_return_pct": 51.329,
+      "sharpe_ratio": 1.5592,
+      "max_drawdown_pct": -9.6383,
+      "final_value": 15132.9,
+      "initial_value": 10000.0,
+      "n_days": 683
+    },
+    "models": {
+      "dlinear_prc": {
+        "annual_return_pct": 155.6985,
+        "sharpe_ratio": 2.0844,
+        "max_drawdown_pct": -13.8677,
+        "final_value": 25569.85,
+        "initial_value": 10000.0,
+        "n_days": 587
+      },
+      "crossformer_prc": {
+        "annual_return_pct": 66.6706,
+        "sharpe_ratio": 1.9016,
+        "max_drawdown_pct": -7.7798,
+        "final_value": 16667.06,
+        "initial_value": 10000.0,
+        "n_days": 587
+      },
+      "dlinear_ret": {
+        "annual_return_pct": 268.9336,
+        "sharpe_ratio": 1.5542,
+        "max_drawdown_pct": -37.1496,
+        "final_value": 36893.36,
+        "initial_value": 10000.0,
+        "n_days": 587
+      },
+      "crossformer_ret": {
+        "annual_return_pct": 260.8161,
+        "sharpe_ratio": 1.5512,
+        "max_drawdown_pct": -36.5543,
+        "final_value": 36081.61,
+        "initial_value": 10000.0,
+        "n_days": 587
+      }
+    }
+  }
+]
