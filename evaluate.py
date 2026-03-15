@@ -442,8 +442,11 @@ def main():
     update_performance_history(cfg.RESULTS_DIR, today_str, results)
 
     # Archive this run's results for paper comparison
-    from train import archive_results
-    archive_results(cfg, today_str)
+    try:
+        from train import archive_results
+        archive_results(cfg, today_str)
+    except Exception as e:
+        print(f"  ⚠️  Archive skipped: {e}")
 
     print(f"\n🎉 Evaluation complete for Module {cfg.MODULE} [{today_str}]")
 
