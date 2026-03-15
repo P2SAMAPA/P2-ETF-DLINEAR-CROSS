@@ -326,10 +326,13 @@ def render_portfolio_chart(eval_results: dict, model_name: str):
 
 
 def render_metrics_cards(metrics: dict, label: str):
-    c1, c2, c3 = st.columns(3)
-    c1.metric(f"{label} — Annual Return", f"{metrics.get('annual_return_pct', 'N/A')}%")
-    c2.metric(f"{label} — Sharpe Ratio",  f"{metrics.get('sharpe_ratio', 'N/A')}")
-    c3.metric(f"{label} — Max Drawdown",  f"{metrics.get('max_drawdown_pct', 'N/A')}%")
+    c1, c2, c3, c4 = st.columns(4)
+    total = metrics.get('total_return_pct', metrics.get('annual_return_pct', 'N/A'))
+    cagr  = metrics.get('annual_return_pct', 'N/A')
+    c1.metric(f"{label} — Total Return",  f"{total}%")
+    c2.metric(f"{label} — CAGR",          f"{cagr}%")
+    c3.metric(f"{label} — Sharpe Ratio",  f"{metrics.get('sharpe_ratio', 'N/A')}")
+    c4.metric(f"{label} — Max Drawdown",  f"{metrics.get('max_drawdown_pct', 'N/A')}%")
 
 
 # ── Main app ──────────────────────────────────────────────────────────────────
@@ -421,8 +424,9 @@ def main():
 
             # Buy & Hold metrics
             bh_metrics = eval_results.get("buy_and_hold", {}).get("metrics", {})
+            n_years    = bh_metrics.get("n_years", "")
             if bh_metrics:
-                render_metrics_cards(bh_metrics, "Buy & Hold")
+                render_metrics_cards(bh_metrics, f"Buy & Hold ({n_years}y test)")
 
             st.divider()
 
@@ -589,37 +593,37 @@ def main():
 
         # Build comparison table
         rows = []
-        rows.append({
-            "Model":          "📈 Buy & Hold (baseline)",
-            "Annual Return":  f"{bh.get('annual_return_pct', 'N/A')}%",
-            "Sharpe Ratio":   bh.get('sharpe_ratio', 'N/A'),
-            "Max Drawdown":   f"{bh.get('max_drawdown_pct', 'N/A')}%",
-            "Final Value":    f"${bh.get('final_value', 'N/A'):,.2f}" if isinstance(bh.get('final_value'), float) else "N/A",
-        })
+        def fmt_row(label, m, bh_total=None):
+            total  = m.get('total_return_pct', m.get('annual_return_pct', 'N/A'))
+            cagr   = m.get('annual_return_pct', 'N/A')
+            n_yrs  = m.get('n_years', '')
+            beats  = isinstance(total, (int,float)) and isinstance(bh_total, (int,float)) and total > bh_total
+            prefix = "✅" if beats else "⚙️"
+            return {
+                "Model":            label if "baseline" in label else f"{prefix} {label}",
+                "Total Return":     f"{total}%" if isinstance(total, (int,float)) else "—",
+                "CAGR (Ann.)":      f"{cagr}%" if isinstance(cagr, (int,float)) else "—",
+                f"Period ({n_yrs}y)": "",
+                "Sharpe Ratio":     m.get('sharpe_ratio', 'N/A'),
+                "Max Drawdown":     f"{m.get('max_drawdown_pct', 'N/A')}%",
+                "Final $10k →":     f"${m.get('final_value', 0):,.2f}" if isinstance(m.get('final_value'), float) else "N/A",
+            }
+
+        bh_total = bh.get('total_return_pct', bh.get('annual_return_pct', 0))
+        rows.append(fmt_row("📈 Buy & Hold (baseline)", bh))
 
         models_data = eval_results.get("models", {})
         for variant, variant_label in VARIANTS:
             m = models_data.get(variant, {}).get("metrics", {})
             if not m:
                 rows.append({
-                    "Model":         f"⚙️ {variant_label}",
-                    "Annual Return": "—",
-                    "Sharpe Ratio":  "—",
-                    "Max Drawdown":  "—",
-                    "Final Value":   "—",
+                    "Model": f"⚙️ {variant_label}",
+                    "Total Return": "—", "CAGR (Ann.)": "—",
+                    "Sharpe Ratio": "—", "Max Drawdown": "—",
+                    "Final $10k →": "—",
                 })
             else:
-                # Highlight if beats B&H
-                ret = m.get('annual_return_pct', 0)
-                bh_ret = bh.get('annual_return_pct', 0)
-                prefix = "✅" if isinstance(ret, (int,float)) and isinstance(bh_ret, (int,float)) and ret > bh_ret else "⚙️"
-                rows.append({
-                    "Model":         f"{prefix} {variant_label}",
-                    "Annual Return": f"{ret}%",
-                    "Sharpe Ratio":  m.get('sharpe_ratio', 'N/A'),
-                    "Max Drawdown":  f"{m.get('max_drawdown_pct', 'N/A')}%",
-                    "Final Value":   f"${m.get('final_value', 0):,.2f}" if isinstance(m.get('final_value'), float) else "N/A",
-                })
+                rows.append(fmt_row(variant_label, m, bh_total))
 
         metrics_df = pd.DataFrame(rows)
         st.dataframe(metrics_df, use_container_width=True, hide_index=True)
