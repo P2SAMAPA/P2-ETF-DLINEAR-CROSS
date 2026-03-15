@@ -240,9 +240,22 @@ def generate_signals(module: str, model_name: str,
         return None
     model.eval()
 
+    # Build timestamp mark for most recent window start
+    from data_loader import compute_timestamp_features
+    recent_idx   = ohlcv_df.iloc[-(cfg.SEQ_LEN + 50):].index
+    valid_idx    = features_df.index
+    window_start = valid_idx[-cfg.SEQ_LEN]
+    ts_arr       = compute_timestamp_features(pd.DatetimeIndex([window_start]))
+    ts_mark      = torch.tensor(ts_arr, dtype=torch.float32)   # (1, 4)
+
+    import inspect as _inspect
     X = torch.tensor(recent_scaled, dtype=torch.float32).unsqueeze(0)
     with torch.no_grad():
-        O = model(X).squeeze(0).numpy()    # (N+1,)
+        sig = _inspect.signature(model.forward)
+        if 'ts_mark' in sig.parameters:
+            O = model(X, ts_mark).squeeze(0).numpy()
+        else:
+            O = model(X).squeeze(0).numpy()    # (N+1,)
 
     use_hold = getattr(cfg, 'USE_HOLD', False)
     N        = cfg.N_ASSETS
@@ -358,11 +371,15 @@ def main():
             "crossformer_prc",
             "dlinear_ret",
             "crossformer_ret",
+            "mole_prc",
+            "mole_ret",
         ], format_func=lambda x: {
             "dlinear_prc":     "DLinear + Price Loss (PRC)",
             "crossformer_prc": "Crossformer + Price Loss (PRC)",
             "dlinear_ret":     "DLinear + Return Loss (RET)",
             "crossformer_ret": "Crossformer + Return Loss (RET)",
+            "mole_prc":        "MoLE-DLinear + Price Loss (PRC) 🆕",
+            "mole_ret":        "MoLE-DLinear + Return Loss (RET) 🆕",
         }.get(x, x))
 
         st.divider()
@@ -473,7 +490,21 @@ def main():
 
         with col1:
             st.markdown("**Architecture Details**")
-            if arch == "dlinear":
+            if arch == "mole":
+                n_heads = getattr(cfg, 'MOLE_N_HEADS', 4)
+                st.markdown(f"""
+- **Model**: MoLE-DLinear ({loss_type} loss) 🆕
+- **Experts (heads)**: {n_heads} DLinear models in parallel
+- **Router**: 2-layer MLP on timestamp embedding
+- **Timestamp features**: day_of_week, day_of_month, month, quarter
+- **Mixing**: channel-wise softmax weighted sum
+- **Seq Length**: {cfg.SEQ_LEN} trading days
+- **Output**: {cfg.N_ASSETS} neurons (tanh, no Hold)
+- **Loss**: StockLoss-L2 {loss_type}
+- **γ (smooth sign)**: {cfg.GAMMA}
+- **Paper**: Ni et al. (AISTATS 2024)
+                """)
+            elif arch == "dlinear":
                 st.markdown(f"""
 - **Model**: DLinear ({loss_type} loss)
 - **Decomposition**: Seasonal-Trend (kernel=25)
@@ -555,6 +586,8 @@ def main():
             ("crossformer_prc", "Crossformer + PRC"),
             ("dlinear_ret",     "DLinear + RET"),
             ("crossformer_ret", "Crossformer + RET"),
+            ("mole_prc",        "MoLE-DLinear + PRC 🆕"),
+            ("mole_ret",        "MoLE-DLinear + RET 🆕"),
         ]
 
         hf_meta_sum  = load_hf_metadata(sum_module)
