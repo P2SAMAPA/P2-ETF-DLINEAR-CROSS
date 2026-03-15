@@ -241,7 +241,8 @@ class Crossformer(nn.Module):
 def get_model(model_name: str, cfg) -> nn.Module:
     """
     Instantiate a model from config.
-    model_name: 'dlinear' or 'crossformer'
+    model_name: 'dlinear', 'crossformer',
+                or variant like 'dlinear_prc', 'crossformer_ret'
     cfg       : config_equity or config_fixed_income module
     """
     n_feat   = cfg.N_ASSETS * 6     # 6 features per ETF (close, return, vol_change, ma5, ma20, rsi)
@@ -250,7 +251,10 @@ def get_model(model_name: str, cfg) -> nn.Module:
     bias_init = getattr(cfg, 'OUTPUT_BIAS_INIT', 1.0)
     use_hold  = getattr(cfg, 'USE_HOLD', False)
 
-    if model_name.lower() == "dlinear":
+    # Strip loss suffix if present (e.g. "dlinear_prc" → "dlinear")
+    arch = model_name.lower().split("_")[0]
+
+    if arch == "dlinear":
         return DLinear(
             seq_len    = cfg.SEQ_LEN,
             n_features = n_feat,
@@ -259,7 +263,7 @@ def get_model(model_name: str, cfg) -> nn.Module:
             bias_init  = bias_init,
             use_hold   = use_hold,
         )
-    elif model_name.lower() == "crossformer":
+    elif arch == "crossformer":
         return Crossformer(
             seq_len    = cfg.SEQ_LEN,
             n_features = n_feat,
@@ -274,4 +278,4 @@ def get_model(model_name: str, cfg) -> nn.Module:
             use_hold   = use_hold,
         )
     else:
-        raise ValueError(f"Unknown model: {model_name}. Choose 'dlinear' or 'crossformer'.")
+        raise ValueError(f"Unknown model arch: '{arch}' (from '{model_name}'). Choose 'dlinear' or 'crossformer'.")
