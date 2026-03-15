@@ -1,0 +1,58 @@
+# train_equity_transformer.yml — P2-ETF-DLINEAR-CROSS
+# Trains Crossformer variants on Option A (Equity ETFs)
+# Variants: crossformer_prc, crossformer_ret
+
+name: Train — Option A Equity (Crossformer)
+
+on:
+  schedule:
+    - cron: "0 22 * * 1-5"    # Mon-Fri 22:00 UTC (same time as linear)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  train_equity_transformer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180       # Crossformer ~2.5 hours
+
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Train Crossformer variants (Option A)
+        run: python train.py --module A --variants crossformer_prc crossformer_ret
+
+      - name: Evaluate Option A (Crossformer)
+        run: python evaluate.py --module A
+
+      - name: Commit results
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add results/equity/ results/archive/
+          git stash
+          git pull --rebase origin main
+          git stash pop
+          git add results/equity/ results/archive/
+          git diff --staged --quiet || git commit -m "chore: equity crossformer model results [$(date -u '+%Y-%m-%d %H:%M UTC')]"
+          git push
+
+      - name: Log completion
+        run: echo "✅ Equity crossformer training complete at $(date -u)"
