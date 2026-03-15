@@ -113,6 +113,23 @@ def buy_and_hold(prices: np.ndarray, initial: float = 10_000.0) -> np.ndarray:
     return np.array(values)
 
 
+def buy_and_hold_single(prices: np.ndarray, ticker_idx: int,
+                        initial: float = 10_000.0) -> np.ndarray:
+    """Buy and hold a single ETF by index."""
+    budget = initial
+    values = [budget]
+    for t in range(len(prices) - 1):
+        p_curr = prices[t, ticker_idx]
+        p_next = prices[t + 1, ticker_idx]
+        if p_curr > 0:
+            pct_ret = (p_next - p_curr) / p_curr
+        else:
+            pct_ret = 0.0
+        budget = budget * (1.0 + pct_ret)
+        values.append(max(budget, 0.0))
+    return np.array(values)
+
+
 def compute_metrics(portfolio_values: np.ndarray,
                     initial: float = 10_000.0) -> dict:
     returns = np.diff(portfolio_values) / portfolio_values[:-1]
@@ -262,15 +279,29 @@ def evaluate_model(model_name: str, cfg, test_prices: np.ndarray,
             "pct_below_m02": round(float((vals < -0.2).mean() * 100), 2),  # % days clear SHORT signal
         }
 
+    # Single ETF B&H — use the model's most allocated ETF over the test period
+    top_ticker_idx  = int(np.argmax([avg_alloc.get(t, 0) for t in cfg.TICKERS]))
+    top_ticker_name = cfg.TICKERS[top_ticker_idx]
+    single_bh       = buy_and_hold_single(price_window, top_ticker_idx)
+    single_bh_metrics = compute_metrics(single_bh)
+    print(f"     Top ETF B&H  : {top_ticker_name} → "
+          f"{single_bh_metrics['total_return_pct']:.2f}% total / "
+          f"{single_bh_metrics['annual_return_pct']:.2f}% CAGR")
+
     return {
-        "metrics":           metrics,
-        "bh_metrics":        bh_metrics,
-        "avg_alloc_pct":     avg_alloc,
-        "buy_ratio_pct":     buy_ratio,
-        "output_stats":      output_stats,
-        "portfolio_values":  portfolio.tolist(),
-        "bh_values":         bh.tolist(),
-        "weight_file":       os.path.basename(weight_path),
+        "metrics":              metrics,
+        "bh_metrics":           bh_metrics,
+        "avg_alloc_pct":        avg_alloc,
+        "buy_ratio_pct":        buy_ratio,
+        "output_stats":         output_stats,
+        "portfolio_values":     portfolio.tolist(),
+        "bh_values":            bh.tolist(),
+        "single_etf_bh": {
+            "ticker":           top_ticker_name,
+            "metrics":          single_bh_metrics,
+            "portfolio_values": single_bh.tolist(),
+        },
+        "weight_file":          os.path.basename(weight_path),
     }
 
 
