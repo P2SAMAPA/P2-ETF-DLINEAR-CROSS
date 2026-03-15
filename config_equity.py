@@ -57,11 +57,17 @@ USE_HOLD     = False
 
 # ── Model variants to train ───────────────────────────────────────────────────
 MODEL_VARIANTS = [
-    ("dlinear",     "L2", "PRC"),
-    ("crossformer", "L2", "PRC"),
-    ("dlinear",     "L2", "RET"),
-    ("crossformer", "L2", "RET"),
+    ("dlinear",     "L2", "PRC"),   # Phase 2/3 baseline
+    ("crossformer", "L2", "PRC"),   # Phase 2/3 baseline
+    ("dlinear",     "L2", "RET"),   # Phase 2/3 best performer
+    ("crossformer", "L2", "RET"),   # Phase 2/3 best performer
+    ("mole",        "L2", "PRC"),   # Phase 4: MoLE-DLinear + Price loss
+    ("mole",        "L2", "RET"),   # Phase 4: MoLE-DLinear + Return loss
 ]
+
+# MoLE hyperparameters (Phase 4)
+MOLE_N_HEADS      = 4     # number of DLinear experts
+MOLE_HEAD_DROPOUT = 0.0   # head dropout rate (0 = off, 0.2 = regularised)
 
 # DLinear
 DLINEAR_INDIVIDUAL = False
