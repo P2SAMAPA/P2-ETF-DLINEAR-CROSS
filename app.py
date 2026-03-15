@@ -453,29 +453,30 @@ def main():
 
         col1, col2 = st.columns(2)
 
+        arch      = model_name.split("_")[0]
+        loss_type = model_name.split("_")[1].upper() if "_" in model_name else "PRC"
+
         with col1:
             st.markdown("**Architecture Details**")
-            arch = model_name.split("_")[0]   # "dlinear" or "crossformer"
-        loss_type = model_name.split("_")[1].upper() if "_" in model_name else "PRC"
-        if arch == "dlinear":
+            if arch == "dlinear":
                 st.markdown(f"""
 - **Model**: DLinear ({loss_type} loss)
 - **Decomposition**: Seasonal-Trend (kernel=25)
 - **Seq Length**: {cfg.SEQ_LEN} trading days
-- **Output**: {cfg.N_ASSETS}+1 neurons (tanh)
-- **Loss**: StockLoss-L2 PRC
+- **Output**: {cfg.N_ASSETS} neurons (tanh, no Hold)
+- **Loss**: StockLoss-L2 {loss_type}
 - **γ (smooth sign)**: {cfg.GAMMA}
                 """)
             else:
                 st.markdown(f"""
-- **Model**: Crossformer
+- **Model**: Crossformer ({loss_type} loss)
 - **d_model**: {cfg.CROSS_D_MODEL}
 - **Heads**: {cfg.CROSS_N_HEADS}
 - **Encoder layers**: {cfg.CROSS_E_LAYERS}
 - **Segment length**: {cfg.CROSS_SEG_LEN}
 - **Seq Length**: {cfg.SEQ_LEN} trading days
-- **Output**: {cfg.N_ASSETS}+1 neurons (tanh)
-- **Loss**: StockLoss-L2 PRC
+- **Output**: {cfg.N_ASSETS} neurons (tanh, no Hold)
+- **Loss**: StockLoss-L2 {loss_type}
 - **γ (smooth sign)**: {cfg.GAMMA}
                 """)
 
