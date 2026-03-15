@@ -62,11 +62,11 @@ MODEL_VARIANTS = [
     ("crossformer", "L2", "PRC"),   # Phase 2/3 baseline
     ("dlinear",     "L2", "RET"),   # Phase 2/3 best performer
     ("crossformer", "L2", "RET"),   # Phase 2/3 best performer
-    ("mole",        "L2", "PRC"),   # Phase 4: MoLE-DLinear + Price loss
-    ("mole",        "L2", "RET"),   # Phase 4: MoLE-DLinear + Return loss
 ]
+# MoLE-DLinear + RET is trained separately via walk-forward
+# using train_mole_walkforward.py — see train_mole_walkforward.yml
 
-# MoLE hyperparameters (Phase 4)
+# MoLE hyperparameters (used by train_mole_walkforward.py)
 MOLE_N_HEADS      = 4     # number of DLinear experts
 MOLE_HEAD_DROPOUT = 0.0   # head dropout rate
 
