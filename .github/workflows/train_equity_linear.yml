@@ -1,12 +1,14 @@
 # train_equity_linear.yml — P2-ETF-DLINEAR-CROSS
 # Trains DLinear + MoLE-DLinear variants on Option A (Equity ETFs)
 # Variants: dlinear_prc, dlinear_ret, mole_prc, mole_ret
+# NOTE: Evaluation is NOT run here — use evaluate_only.yml after
+# BOTH equity workflows complete to get full results including Crossformer.
 
 name: Train — Option A Equity (Linear Models)
 
 on:
   schedule:
-    - cron: "0 22 * * 1-5"    # Mon-Fri 22:00 UTC
+    - cron: "0 22 * * 1-5"
   workflow_dispatch:
 
 permissions:
@@ -15,11 +17,10 @@ permissions:
 jobs:
   train_equity_linear:
     runs-on: ubuntu-latest
-    timeout-minutes: 180       # DLinear + MoLE ~3 hours
+    timeout-minutes: 180
 
     env:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
-      TRAIN_VARIANTS: "dlinear_prc,dlinear_ret,mole_prc,mole_ret"
 
     steps:
       - name: Checkout repository
@@ -40,10 +41,7 @@ jobs:
       - name: Train DLinear + MoLE variants (Option A)
         run: python train.py --module A --variants dlinear_prc dlinear_ret mole_prc mole_ret
 
-      - name: Evaluate Option A (Linear)
-        run: python evaluate.py --module A
-
-      - name: Commit results
+      - name: Commit weights only (no evaluate — run evaluate_only.yml after both workflows finish)
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -52,8 +50,8 @@ jobs:
           git pull --rebase origin main
           git stash pop
           git add results/equity/ results/archive/
-          git diff --staged --quiet || git commit -m "chore: equity linear model results [$(date -u '+%Y-%m-%d %H:%M UTC')]"
+          git diff --staged --quiet || git commit -m "chore: equity linear model weights [$(date -u '+%Y-%m-%d %H:%M UTC')]"
           git push
 
       - name: Log completion
-        run: echo "✅ Equity linear training complete at $(date -u)"
+        run: echo "✅ Equity linear training complete — run evaluate_only.yml next"
