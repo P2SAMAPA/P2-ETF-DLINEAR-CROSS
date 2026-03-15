@@ -58,11 +58,17 @@ USE_HOLD     = False  # disable Hold node — forces model to always trade
 # Each entry: (model_arch, loss_variant, loss_type)
 # loss_type: "PRC" = price diff (best in paper), "RET" = return % diff
 MODEL_VARIANTS = [
-    ("dlinear",     "L2", "PRC"),   # DLinear + StockLoss-L2 Price
-    ("crossformer", "L2", "PRC"),   # Crossformer + StockLoss-L2 Price
-    ("dlinear",     "L2", "RET"),   # DLinear + StockLoss-L2 Return
-    ("crossformer", "L2", "RET"),   # Crossformer + StockLoss-L2 Return
+    ("dlinear",     "L2", "PRC"),   # Phase 2/3 baseline
+    ("crossformer", "L2", "PRC"),   # Phase 2/3 baseline
+    ("dlinear",     "L2", "RET"),   # Phase 2/3 best performer
+    ("crossformer", "L2", "RET"),   # Phase 2/3 best performer
+    ("mole",        "L2", "PRC"),   # Phase 4: MoLE-DLinear + Price loss
+    ("mole",        "L2", "RET"),   # Phase 4: MoLE-DLinear + Return loss
 ]
+
+# MoLE hyperparameters (Phase 4)
+MOLE_N_HEADS      = 4     # number of DLinear experts
+MOLE_HEAD_DROPOUT = 0.0   # head dropout rate
 
 FEATURE_COLS = ["Close", "Volume"]
 N_ASSETS     = len(TICKERS)
