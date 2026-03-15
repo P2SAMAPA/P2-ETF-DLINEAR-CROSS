@@ -1,0 +1,100 @@
+# train_mole_walkforward.yml — P2-ETF-DLINEAR-CROSS
+# Walk-forward training for MoLE-DLinear + RET loss
+# Each fold: 3yr train + 1yr val + 1yr test, rolling 1yr forward
+# All fold test predictions concatenated into one equity curve
+
+name: Train — MoLE Walk-Forward (Both Modules)
+
+on:
+  workflow_dispatch:    # manual trigger only — not daily
+  # Run periodically (monthly) to update with latest data
+  schedule:
+    - cron: "0 20 1 * *"    # 1st of each month at 20:00 UTC
+
+permissions:
+  contents: write
+
+jobs:
+  mole_walkforward_A:
+    name: MoLE Walk-Forward — Option A (Equity)
+    runs-on: ubuntu-latest
+    timeout-minutes: 360    # 6 hours — many folds x 300 epochs each
+
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Train MoLE Walk-Forward — Option A
+        run: python train_mole_walkforward.py --module A
+
+      - name: Commit results
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add results/equity/mole_ret_walkforward_*.json
+          git stash
+          git pull --rebase origin main
+          git stash pop
+          git add results/equity/mole_ret_walkforward_*.json
+          git diff --staged --quiet || git commit -m "chore: MoLE walk-forward equity results [$(date -u '+%Y-%m-%d %H:%M UTC')]"
+          git push
+
+      - name: Log completion
+        run: echo "✅ MoLE walk-forward equity complete at $(date -u)"
+
+  mole_walkforward_B:
+    name: MoLE Walk-Forward — Option B (Fixed Income)
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Train MoLE Walk-Forward — Option B
+        run: python train_mole_walkforward.py --module B
+
+      - name: Commit results
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add results/fixed_income/mole_ret_walkforward_*.json
+          git stash
+          git pull --rebase origin main
+          git stash pop
+          git add results/fixed_income/mole_ret_walkforward_*.json
+          git diff --staged --quiet || git commit -m "chore: MoLE walk-forward fixed income results [$(date -u '+%Y-%m-%d %H:%M UTC')]"
+          git push
+
+      - name: Log completion
+        run: echo "✅ MoLE walk-forward fixed income complete at $(date -u)"
