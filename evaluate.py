@@ -355,14 +355,17 @@ def main():
         "models": {},
     }
 
-    for model_name in ["dlinear", "crossformer"]:
+    variants = getattr(cfg, 'MODEL_VARIANTS',
+                       [("dlinear","L2","PRC"),("crossformer","L2","PRC")])
+    for arch, loss_variant, loss_type in variants:
+        variant_name = f"{arch}_{loss_type.lower()}"
         print(f"\n{'─'*45}")
-        print(f"  {model_name.upper()}")
+        print(f"  {variant_name.upper()}")
         print(f"{'─'*45}")
-        r = evaluate_model(model_name, cfg, test_prices,
+        r = evaluate_model(variant_name, cfg, test_prices,
                            test_features, scaler, device)
         if r:
-            results["models"][model_name] = r
+            results["models"][variant_name] = r
 
     os.makedirs(cfg.RESULTS_DIR, exist_ok=True)
     out_path = os.path.join(cfg.RESULTS_DIR, f"eval_results_{today_str}.json")
