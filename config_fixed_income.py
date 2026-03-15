@@ -20,7 +20,7 @@ TICKERS = [
 START_DATE = "2008-01-01"
 
 # ── Rolling train/val/test split ──────────────────────────────────────────────
-SPLIT_TEST_RATIO  = 0.10
+SPLIT_TEST_RATIO  = 0.15
 SPLIT_VAL_RATIO   = 0.10
 
 # Display labels only
@@ -33,7 +33,7 @@ SEQ_LEN    = 96
 PRED_LEN   = 1
 LABEL_LEN  = 0
 BATCH_SIZE = 32
-EPOCHS     = 50
+EPOCHS     = 300
 LR         = 0.005
 GAMMA      = 10
 
