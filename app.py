@@ -666,6 +666,29 @@ def main():
             "📊 = moderate | ❓ = inconsistent"
         )
 
+        with st.expander("📖 How to read Signal Stability", expanded=False):
+            st.markdown("""
+**What is Signal Stability?**
+Signal Stability measures whether a model's top ETF pick is a genuine recurring conviction or a one-off fluke.
+It looks at three things across all test days:
+
+| Metric | What it means |
+|---|---|
+| **Avg alloc %** | Average portfolio weight given to this ETF across all test days. High = the model consistently puts most of its money here. |
+| **BUY X% of days** | How often this ETF had a clear BUY signal (tanh output > 0.2) during the test period. High = consistent direction. |
+| **raw μ (mean)** | Average raw tanh output value. Range is -1 to +1. A mean of 0.87 means the model outputs a strong positive signal almost every day. |
+| **raw σ (std dev)** | Variability of the raw output. Low σ = the model is consistent. High σ = the signal fluctuates a lot and today's reading may not be representative. |
+
+**Conviction scoring:**
+- 🎯 **Strong conviction** — mean output > 0.3 AND std dev < 0.3 AND BUY > 60% of days. The model consistently picked this ETF with a strong signal. Trust this signal.
+- 📊 **Moderate** — mean output > 0.1 AND BUY > 40% of days. The model leans this way but with less certainty.
+- ❓ **Inconsistent** — low average output despite occasional high allocation. The 100% allocation you see today may be an extreme reading of a noisy signal — treat with caution.
+
+**Example interpretation:**
+- `🎯 GLD: 94% avg alloc | BUY 88% of days | raw μ=0.87 σ=0.09` → Genuine conviction. The model outputs a strong, stable signal for GLD on almost every test day. High confidence.
+- `❓ XES: 48% avg alloc | BUY 55% of days | raw μ=0.21 σ=0.38` → Likely a fluke. The model is barely above the BUY threshold on average and very inconsistent. Today's 100% reading is an outlier.
+            """)
+
         stab_cols = st.columns(4)
         for col_idx, (variant, variant_label) in enumerate(VARIANTS):
             with stab_cols[col_idx]:
@@ -678,21 +701,32 @@ def main():
                     st.caption("No data yet")
                     continue
 
+                output_stats  = model_metrics.get("output_stats", {})
+
                 # Sort by avg allocation, show top 3
                 top3 = sorted(alloc_pct.items(),
                               key=lambda x: x[1], reverse=True)[:3]
                 for ticker, alloc in top3:
-                    buy_pct = buy_ratio.get(ticker, 0)
-                    if alloc > 30 and buy_pct > 60:
-                        icon = "🎯"
-                    elif alloc > 10 and buy_pct > 40:
-                        icon = "📊"
+                    buy_pct   = buy_ratio.get(ticker, 0)
+                    stats     = output_stats.get(ticker, {})
+                    mean_out  = stats.get("mean", None)
+                    std_out   = stats.get("std", None)
+                    pct_clear = stats.get("pct_above_02", buy_pct)
+
+                    # Conviction: high mean output + low std = consistent
+                    if mean_out is not None:
+                        is_conviction = mean_out > 0.3 and std_out < 0.3 and pct_clear > 60
+                        is_moderate   = mean_out > 0.1 and pct_clear > 40
                     else:
-                        icon = "❓"
-                    st.markdown(
-                        f"{icon} **{ticker}**: avg {alloc:.1f}% alloc | "
-                        f"BUY {buy_pct:.0f}% of days"
-                    )
+                        is_conviction = alloc > 30 and buy_pct > 60
+                        is_moderate   = alloc > 10 and buy_pct > 40
+
+                    icon = "🎯" if is_conviction else ("📊" if is_moderate else "❓")
+
+                    line = f"{icon} **{ticker}**: {alloc:.1f}% avg alloc | BUY {pct_clear:.0f}% of days"
+                    if mean_out is not None:
+                        line += f" | raw μ={mean_out:.2f} σ={std_out:.2f}"
+                    st.markdown(line)
 
         # ── Section 3: Portfolio value chart — all 4 variants + B&H ─────────
         st.divider()
