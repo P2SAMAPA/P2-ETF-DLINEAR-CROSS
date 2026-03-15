@@ -176,9 +176,14 @@ def generate_signals(module: str, model_name: str,
     # Model forward pass — CPU only
     device = torch.device("cpu")
     model  = get_model(model_name, cfg).to(device)
-    model.load_state_dict(
-        torch.load(weight_path, map_location=device, weights_only=True)
-    )
+    try:
+        model.load_state_dict(
+            torch.load(weight_path, map_location=device, weights_only=True)
+        )
+    except RuntimeError:
+        # Weight mismatch — old weights incompatible with new architecture
+        # Happens when USE_HOLD changed. Re-train to fix.
+        return None
     model.eval()
 
     X = torch.tensor(recent_scaled, dtype=torch.float32).unsqueeze(0)
