@@ -431,6 +431,10 @@ def main():
             # Buy & Hold metrics
             bh_metrics = eval_results.get("buy_and_hold", {}).get("metrics", {})
             if bh_metrics:
+                st.caption(
+                    "📊 **Equal-Weight Buy & Hold** — equal allocation across all "
+                    f"{len(cfg.TICKERS)} ETFs in this module, held for the full test period."
+                )
                 render_metrics_cards(bh_metrics, "Buy & Hold")
 
             st.divider()
@@ -584,6 +588,19 @@ def main():
         # ── Section 2: Backtest Metrics Comparison ────────────────────────────
         st.divider()
         st.subheader("📊 Backtest Performance — All Models vs Buy & Hold")
+        with st.expander("📖 About the benchmarks", expanded=False):
+            st.markdown("""
+**Equal-Weight Buy & Hold** — splits the portfolio equally across all ETFs in the module
+and holds them for the entire test period. For Option A this is 1/10th in each of the
+10 equity ETFs; for Option B it is 1/8th in each of the 8 fixed income/commodity ETFs.
+This is the standard portfolio benchmark used in the paper (Kar et al., 2025).
+
+**Single ETF Buy & Hold** — buys and holds only the single ETF that the model allocated
+the most capital to on average across the test period (e.g. GLD or SLV). This is the most
+relevant benchmark for live trading since the model is effectively recommending one ETF.
+If the model cannot beat simply buying and holding its own top pick, the active trading
+strategy adds no value.
+            """)
 
         if not eval_results:
             st.warning("No evaluation results found. Run training first.")
@@ -646,13 +663,27 @@ def main():
             m = models_data.get(variant, {}).get("metrics", {})
             if not m:
                 rows.append({
-                    "Model": f"⚙️ {variant_label}",
-                    "Total Return": "—", "CAGR (Ann.)": "—",
-                    "Sharpe Ratio": "—", "Max Drawdown": "—",
-                    "Final $10k →": "—",
+                    "Model":          f"⚙️ {variant_label}",
+                    "Total Return":   "—",
+                    "CAGR (Ann.)":    "—",
+                    "Test Period":    "—",
+                    "Sharpe Ratio":   "—",
+                    "Max Drawdown":   "—",
+                    "Final $10k →":   "—",
                 })
             else:
                 rows.append(fmt_row(variant_label, m, bh_total))
+
+            # Add single ETF B&H row directly below each model
+            single = models_data.get(variant, {}).get("single_etf_bh", {})
+            if single:
+                ticker   = single.get("ticker", "")
+                sm       = single.get("metrics", {})
+                rows.append(fmt_row(
+                    f"  └ {ticker} B&H (model top pick)",
+                    sm,
+                    bh_total
+                ))
 
         metrics_df = pd.DataFrame(rows)
         st.dataframe(metrics_df, use_container_width=True, hide_index=True)
