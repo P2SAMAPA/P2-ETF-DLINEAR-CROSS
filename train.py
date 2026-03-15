@@ -33,11 +33,14 @@ from loss_functions import get_loss_fn
 
 # ── Training one epoch ────────────────────────────────────────────────────────
 
+def is_mole_model(model) -> bool:
+    """Check once if model accepts ts_mark — cache via model class name."""
+    return 'MoLE' in type(model).__name__
+
+
 def model_forward(model, X, ts_mark):
-    """Forward pass — passes ts_mark for MoLE, ignores for others."""
-    import inspect
-    sig = inspect.signature(model.forward)
-    if 'ts_mark' in sig.parameters:
+    """Forward pass — passes ts_mark only for MoLE models."""
+    if is_mole_model(model):
         return model(X, ts_mark)
     return model(X)
 
@@ -271,6 +274,10 @@ def main():
             print(f"Available: {[f'{a}_{t.lower()}' for a,v,t in cfg.MODEL_VARIANTS]}")
             return
 
+    # Set seeds for reproducibility across parallel workflows
+    torch.manual_seed(42)
+    np.random.seed(42)
+
     print(f"\nDevice   : {device}")
     print(f"Module   : {cfg.MODULE} - {cfg.LABEL}")
     print(f"Run date : {today_str}")
@@ -290,11 +297,14 @@ def main():
                                train_loader, val_loader, device)
         save_variant(arch, loss_type, result, cfg, today_str)
 
-    # Save scaler
+    # Save scaler — only if not already saved by a parallel workflow today
     scaler_path = os.path.join(cfg.RESULTS_DIR, f"scaler_{today_str}.pkl")
-    with open(scaler_path, "wb") as f:
-        pickle.dump(scaler, f)
-    print(f"\nSaved scaler -> {scaler_path}")
+    if not os.path.exists(scaler_path):
+        with open(scaler_path, "wb") as f:
+            pickle.dump(scaler, f)
+        print(f"\nSaved scaler -> {scaler_path}")
+    else:
+        print(f"\nScaler already exists for today -> {scaler_path} (skipping overwrite)")
     print(f"\nAll variants trained for Module {cfg.MODULE} [{today_str}]")
 
 
