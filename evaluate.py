@@ -118,7 +118,17 @@ def compute_metrics(portfolio_values: np.ndarray,
     returns = np.diff(portfolio_values) / portfolio_values[:-1]
     returns = returns[~np.isnan(returns)]
 
-    annual_return = (portfolio_values[-1] / initial - 1.0) * 100.0
+    n_days       = len(portfolio_values)
+    n_years      = n_days / 252.0
+
+    # Total return
+    total_return = (portfolio_values[-1] / initial - 1.0) * 100.0
+
+    # True annualised return (CAGR)
+    if n_years > 0 and portfolio_values[-1] > 0:
+        cagr = ((portfolio_values[-1] / initial) ** (1.0 / n_years) - 1.0) * 100.0
+    else:
+        cagr = 0.0
 
     sharpe = 0.0
     if len(returns) > 1 and returns.std() > 1e-8:
@@ -129,12 +139,14 @@ def compute_metrics(portfolio_values: np.ndarray,
     max_dd    = float(drawdowns.min()) * 100.0
 
     return {
-        "annual_return_pct": round(float(annual_return), 4),
+        "total_return_pct":  round(float(total_return), 4),
+        "annual_return_pct": round(float(cagr), 4),      # true CAGR
         "sharpe_ratio":      round(float(sharpe), 4),
         "max_drawdown_pct":  round(float(max_dd), 4),
         "final_value":       round(float(portfolio_values[-1]), 2),
         "initial_value":     round(float(initial), 2),
-        "n_days":            len(portfolio_values),
+        "n_days":            n_days,
+        "n_years":           round(float(n_years), 2),
     }
 
 
