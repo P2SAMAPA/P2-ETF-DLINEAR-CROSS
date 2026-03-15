@@ -40,7 +40,7 @@ def train_epoch(model, loader, optimizer, loss_fn, cfg, device):
         X, Y = X.to(device), Y.to(device)
         optimizer.zero_grad()
         O    = model(X)
-        loss = loss_fn(O, Y, gamma=cfg.GAMMA)
+        loss = loss_fn(O, Y, gamma=cfg.GAMMA, use_hold=getattr(cfg, 'USE_HOLD', False))
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
@@ -55,7 +55,7 @@ def eval_epoch(model, loader, loss_fn, cfg, device):
         for X, Y in loader:
             X, Y = X.to(device), Y.to(device)
             O    = model(X)
-            loss = loss_fn(O, Y, gamma=cfg.GAMMA)
+            loss = loss_fn(O, Y, gamma=cfg.GAMMA, use_hold=getattr(cfg, 'USE_HOLD', False))
             total_loss += loss.item()
     return total_loss / len(loader)
 
