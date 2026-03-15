@@ -140,10 +140,11 @@ def load_performance_history(module: str) -> list:
 # ── Signal generation ─────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def generate_signals(module: str, model_name: str) -> pd.DataFrame | None:
+def generate_signals(module: str, model_name: str,
+                     ohlcv_cache_key: str = "") -> pd.DataFrame | None:
     """
     Run trained model on most recent seq_len days → next-day signals.
-    Returns DataFrame with columns: Ticker, Signal, Allocation%, Direction
+    ohlcv_cache_key is passed to bust cache when data updates.
     """
     cfg = cfg_a if module == "A" else cfg_b
 
@@ -153,51 +154,52 @@ def generate_signals(module: str, model_name: str) -> pd.DataFrame | None:
     if not weight_path or not scaler_path:
         return None
 
-    # Load OHLCV
+    # Load scaler first — cheap local file
+    with open(scaler_path, "rb") as f:
+        scaler = pickle.load(f)
+
+    # Use already-cached OHLCV — avoids re-downloading from HF
     ohlcv_df = load_ohlcv(module)
 
-    # Build features
-    features_df, prices_df = build_features(ohlcv_df, cfg.TICKERS)
+    # Build features — only need last seq_len + 30 rows for speed
+    tail_df = ohlcv_df.iloc[-(cfg.SEQ_LEN + 50):]
+    features_df, prices_df = build_features(tail_df, cfg.TICKERS)
     valid = features_df.dropna().index.intersection(prices_df.dropna().index)
     features_df = features_df.loc[valid]
 
-    # Take last seq_len rows
     if len(features_df) < cfg.SEQ_LEN:
         return None
-    recent = features_df.iloc[-cfg.SEQ_LEN:].values
 
-    # Scale
-    with open(scaler_path, "rb") as f:
-        scaler = pickle.load(f)
+    recent        = features_df.iloc[-cfg.SEQ_LEN:].values
     recent_scaled = scaler.transform(recent)
 
-    # Model forward pass
+    # Model forward pass — CPU only
     device = torch.device("cpu")
     model  = get_model(model_name, cfg).to(device)
-    model.load_state_dict(torch.load(weight_path, map_location=device))
+    model.load_state_dict(
+        torch.load(weight_path, map_location=device, weights_only=True)
+    )
     model.eval()
 
-    X = torch.tensor(recent_scaled, dtype=torch.float32).unsqueeze(0)  # (1, seq_len, n_feat)
+    X = torch.tensor(recent_scaled, dtype=torch.float32).unsqueeze(0)
     with torch.no_grad():
         O = model(X).squeeze(0).numpy()    # (N+1,)
 
-    N      = cfg.N_ASSETS
-    O_n    = O[:N]
-    abs_O  = np.abs(O)
-    total  = abs_O.sum()
-    alloc  = (abs_O / total) * 100 if total > 1e-8 else np.zeros(N + 1)
+    N     = cfg.N_ASSETS
+    O_n   = O[:N]
+    abs_O = np.abs(O)
+    total = abs_O.sum()
+    alloc = (abs_O / total) * 100 if total > 1e-8 else np.zeros(N + 1)
 
     rows = []
     for i, ticker in enumerate(cfg.TICKERS):
-        signal    = "BUY" if O_n[i] > 0.2 else ("SHORT" if O_n[i] < -0.2 else "HOLD")
+        signal = "BUY" if O_n[i] > 0.2 else ("SHORT" if O_n[i] < -0.2 else "HOLD")
         rows.append({
             "Ticker":      ticker,
             "Raw Output":  round(float(O_n[i]), 4),
             "Signal":      signal,
             "Allocation%": round(float(alloc[i]), 2),
         })
-
-    # Hold node
     rows.append({
         "Ticker":      "HOLD (cash)",
         "Raw Output":  round(float(O[N]), 4),
@@ -312,8 +314,10 @@ def main():
         st.subheader(f"Next Trading Day Signals — {module_label}")
         st.caption(f"Based on last {cfg.SEQ_LEN} trading days of data")
 
-        with st.spinner("Generating signals..."):
-            signals_df = generate_signals(module, model_name)
+        hf_meta    = load_hf_metadata(module)
+        cache_key  = hf_meta.get("last_data_update", "")
+        with st.spinner("Loading model and computing signals (first load may take ~30s)..."):
+            signals_df = generate_signals(module, model_name, cache_key)
 
         if signals_df is None:
             st.warning(
