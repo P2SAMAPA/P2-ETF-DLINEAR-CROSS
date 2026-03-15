@@ -1,5 +1,6 @@
 # config_equity.py — P2-ETF-DLINEAR-CROSS
 # Configuration for Option A: Equity ETFs
+# Phase 3: XES removed from universe
 
 import math
 from datetime import datetime, date
@@ -12,31 +13,32 @@ PARQUET_FILE    = "ohlcv_equity.parquet"
 METADATA_FILE   = "metadata_equity.json"
 RESULTS_DIR     = "results/equity"
 
-# ETF Universe
+# ETF Universe — XES removed in Phase 3
+# XES (Oil & Gas Equipment & Services) suspected of distorting PRC loss
+# due to low price (~$25) vs other ETFs (SPY ~$550, QQQ ~$500)
 TICKERS = [
-    "SPY", "QQQ", "XLK", "XLF", "XLE",
-    "XLV", "XLI", "GDX", "IWM", "XES",
+    "SPY",   # S&P 500
+    "QQQ",   # NASDAQ 100
+    "XLK",   # Technology
+    "XLF",   # Financials
+    "XLE",   # Energy
+    "XLV",   # Health Care
+    "XLI",   # Industrials
+    "GDX",   # Gold Miners
+    "IWM",   # Russell 2000 Small Cap
+    # "XES" removed — Phase 3 experiment
 ]
 
 START_DATE = "2006-01-01"
 
 # ── Rolling train/val/test split ──────────────────────────────────────────────
-# Computed dynamically at runtime based on today's date.
-# Approximate trading days from today backwards:
-#   Test  : last 10% of data  (~1 year)
-#   Val   : prior 10%         (~1 year)
-#   Train : remaining 80%
-#
-# These are computed in data_loader.py using row counts, not calendar years.
-# SPLIT_RATIOS drives the split — do not use TEST_YEAR/VAL_YEAR for splitting.
 SPLIT_TEST_RATIO  = 0.15
 SPLIT_VAL_RATIO   = 0.10
-# Train ratio = 1 - test - val = 0.80 (implicit)
 
-# Keep these for display/logging purposes only
+# Display labels only
 _today = date.today()
-TEST_YEAR = _today.year - 1      # approx label only
-VAL_YEAR  = _today.year - 2      # approx label only
+TEST_YEAR = _today.year - 1
+VAL_YEAR  = _today.year - 2
 
 # Model hyperparameters
 SEQ_LEN    = 96
@@ -44,12 +46,22 @@ PRED_LEN   = 1
 LABEL_LEN  = 0
 BATCH_SIZE = 32
 EPOCHS     = 300
-LR         = 0.005  # higher LR to escape hold-collapse
+LR         = 0.005
 GAMMA      = 10
 
-# ── Anti-collapse: initialise output layer bias away from zero ────────────────
-# Prevents model collapsing to all-HOLD at the start of training
-OUTPUT_BIAS_INIT = 1.0  # stronger push away from zero
+# Anti-collapse bias init
+OUTPUT_BIAS_INIT = 1.0
+
+# Disable Hold node — forces model to always allocate
+USE_HOLD     = False
+
+# ── Model variants to train ───────────────────────────────────────────────────
+MODEL_VARIANTS = [
+    ("dlinear",     "L2", "PRC"),
+    ("crossformer", "L2", "PRC"),
+    ("dlinear",     "L2", "RET"),
+    ("crossformer", "L2", "RET"),
+]
 
 # DLinear
 DLINEAR_INDIVIDUAL = False
@@ -63,17 +75,5 @@ CROSS_SEG_LEN  = 12
 CROSS_WIN_SIZE = 2
 CROSS_DROPOUT  = 0.2
 
-USE_HOLD     = False  # disable Hold node — forces model to always trade
-
-# ── Model variants to train ───────────────────────────────────────────────────
-# Each entry: (model_arch, loss_variant, loss_type)
-# loss_type: "PRC" = price diff (best in paper), "RET" = return % diff
-MODEL_VARIANTS = [
-    ("dlinear",     "L2", "PRC"),   # DLinear + StockLoss-L2 Price
-    ("crossformer", "L2", "PRC"),   # Crossformer + StockLoss-L2 Price
-    ("dlinear",     "L2", "RET"),   # DLinear + StockLoss-L2 Return
-    ("crossformer", "L2", "RET"),   # Crossformer + StockLoss-L2 Return
-]
-
 FEATURE_COLS = ["Close", "Volume"]
-N_ASSETS     = len(TICKERS)
+N_ASSETS     = len(TICKERS)   # now 9 instead of 10
