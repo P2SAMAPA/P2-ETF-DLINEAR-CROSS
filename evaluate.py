@@ -118,17 +118,18 @@ def compute_metrics(portfolio_values: np.ndarray,
     returns = np.diff(portfolio_values) / portfolio_values[:-1]
     returns = returns[~np.isnan(returns)]
 
-    n_days       = len(portfolio_values)
-    n_years      = n_days / 252.0
+    # n_days = number of trading days in portfolio (excludes initial value)
+    n_days       = len(portfolio_values) - 1
+    n_years      = n_days / 252.0 if n_days > 0 else 1.0
 
     # Total return
     total_return = (portfolio_values[-1] / initial - 1.0) * 100.0
 
     # True annualised return (CAGR)
-    if n_years > 0 and portfolio_values[-1] > 0:
+    if n_years > 0 and portfolio_values[-1] > 0 and initial > 0:
         cagr = ((portfolio_values[-1] / initial) ** (1.0 / n_years) - 1.0) * 100.0
     else:
-        cagr = 0.0
+        cagr = total_return
 
     sharpe = 0.0
     if len(returns) > 1 and returns.std() > 1e-8:
