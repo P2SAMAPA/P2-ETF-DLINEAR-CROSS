@@ -1,0 +1,85 @@
+[
+  {
+    "run_date": "20260314",
+    "test_year": 2023,
+    "buy_and_hold": {
+      "annual_return_pct": 0.2205,
+      "sharpe_ratio": 2.0026,
+      "max_drawdown_pct": -0.1599,
+      "final_value": 10022.05,
+      "initial_value": 10000.0
+    },
+    "models": {
+      "dlinear": {
+        "annual_return_pct": 0.0,
+        "sharpe_ratio": 0.0,
+        "max_drawdown_pct": 0.0,
+        "final_value": 10000.0,
+        "initial_value": 10000.0
+      },
+      "crossformer": {
+        "annual_return_pct": 0.1364,
+        "sharpe_ratio": 0.9153,
+        "max_drawdown_pct": -0.2047,
+        "final_value": 10013.64,
+        "initial_value": 10000.0
+      }
+    }
+  },
+  {
+    "run_date": "20260315",
+    "test_period": "2023-03-27 \u2192 2026-03-13 (744 rows)",
+    "buy_and_hold": {
+      "total_return_pct": 64.573,
+      "annual_return_pct": 21.3778,
+      "sharpe_ratio": 1.351,
+      "max_drawdown_pct": -16.4332,
+      "final_value": 16457.3,
+      "initial_value": 10000.0,
+      "n_days": 648,
+      "n_years": 2.57
+    },
+    "models": {
+      "dlinear_prc": {
+        "total_return_pct": 35.1677,
+        "annual_return_pct": 12.4537,
+        "sharpe_ratio": 1.1208,
+        "max_drawdown_pct": -13.687,
+        "final_value": 13516.77,
+        "initial_value": 10000.0,
+        "n_days": 647,
+        "n_years": 2.57
+      },
+      "crossformer_prc": {
+        "total_return_pct": 49.0969,
+        "annual_return_pct": 16.8327,
+        "sharpe_ratio": 1.1475,
+        "max_drawdown_pct": -17.6332,
+        "final_value": 14909.69,
+        "initial_value": 10000.0,
+        "n_days": 647,
+        "n_years": 2.57
+      },
+      "dlinear_ret": {
+        "total_return_pct": 213.4378,
+        "annual_return_pct": 56.0436,
+        "sharpe_ratio": 1.5249,
+        "max_drawdown_pct": -20.7004,
+        "final_value": 31343.78,
+        "initial_value": 10000.0,
+        "n_days": 647,
+        "n_years": 2.57
+      },
+      "crossformer_ret": {
+        "total_return_pct": 235.1675,
+        "annual_return_pct": 60.1711,
+        "sharpe_ratio": 1.5164,
+        "max_drawdown_pct": -21.9066,
+        "final_value": 33516.75,
+        "initial_value": 10000.0,
+        "n_days": 647,
+        "n_years": 2.57
+      }
+    }
+  }
+]
