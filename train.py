@@ -70,7 +70,7 @@ def train_variant(arch: str, loss_type: str, cfg,
                   train_loader, val_loader, device) -> dict:
     variant_name = f"{arch}_{loss_type.lower()}"
     print(f"\n{'='*55}")
-    print(f"  Training {variant_name.upper()} — Module {cfg.MODULE}")
+    print(f"  Training {variant_name.upper()} - Module {cfg.MODULE}")
     print(f"{'='*55}")
 
     model     = get_model(arch, cfg).to(device)
@@ -209,7 +209,7 @@ def archive_results(cfg, today_str: str):
     # Write a phase README
     readme_path = os.path.join(archive_dir, "PHASE_INFO.md")
     with open(readme_path, "w") as f:
-        f.write(f"# Archive: {phase_label} — Module {cfg.MODULE}
+        f.write(f"# Archive: {phase_label} - Module {cfg.MODULE}
 
 ")
         f.write(f"**Run date**: {today_str}
