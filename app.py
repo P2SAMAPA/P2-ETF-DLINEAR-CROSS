@@ -329,19 +329,16 @@ def render_metrics_cards(metrics: dict, label: str):
     c1, c2, c3, c4 = st.columns(4)
     total  = metrics.get('total_return_pct', metrics.get('annual_return_pct', 'N/A'))
     n_days = metrics.get('n_days', 0)
-    # Recompute true CAGR from total return and n_days
     if isinstance(total, (int, float)) and n_days > 0:
-        n_years = n_days / 252.0
-        cagr = round(((1 + total / 100.0) ** (1.0 / n_years) - 1.0) * 100.0, 4)
+        n_years  = n_days / 252.0
+        cagr     = round(((1 + total / 100.0) ** (1.0 / n_years) - 1.0) * 100.0, 4)
         cagr_str = f"{cagr}%"
-        period_str = f"{n_years:.1f} yrs"
     else:
-        cagr_str   = "N/A"
-        period_str = ""
-    c1.metric(f"Total Return ({period_str})", f"{total}%" if isinstance(total, (int,float)) else "N/A")
-    c2.metric(f"CAGR (Annualised)",            cagr_str)
-    c3.metric(f"Sharpe Ratio",                 f"{metrics.get('sharpe_ratio', 'N/A')}")
-    c4.metric(f"Max Drawdown",                 f"{metrics.get('max_drawdown_pct', 'N/A')}%")
+        cagr_str = "N/A"
+    c1.metric("Total Return",      f"{total}%" if isinstance(total, (int,float)) else "N/A")
+    c2.metric("CAGR (Annualised)", cagr_str)
+    c3.metric("Sharpe Ratio",      f"{metrics.get('sharpe_ratio', 'N/A')}")
+    c4.metric("Max Drawdown",      f"{metrics.get('max_drawdown_pct', 'N/A')}%")
 
 
 # ── Main app ──────────────────────────────────────────────────────────────────
@@ -433,9 +430,8 @@ def main():
 
             # Buy & Hold metrics
             bh_metrics = eval_results.get("buy_and_hold", {}).get("metrics", {})
-            n_years    = bh_metrics.get("n_years", "")
             if bh_metrics:
-                render_metrics_cards(bh_metrics, f"Buy & Hold ({n_years}y test)")
+                render_metrics_cards(bh_metrics, "Buy & Hold")
 
             st.divider()
 
