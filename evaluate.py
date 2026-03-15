@@ -170,11 +170,13 @@ def compute_metrics(portfolio_values: np.ndarray,
 
 # ── Get signals and raw prices from test set ──────────────────────────────────
 
+def is_mole_model(model) -> bool:
+    return 'MoLE' in type(model).__name__
+
+
 def model_forward(model, X, ts_mark):
-    """Forward pass — passes ts_mark for MoLE, ignores for others."""
-    import inspect
-    sig = inspect.signature(model.forward)
-    if 'ts_mark' in sig.parameters:
+    """Forward pass — passes ts_mark only for MoLE models."""
+    if is_mole_model(model):
         return model(X, ts_mark)
     return model(X)
 
@@ -209,17 +211,12 @@ def evaluate_model(model_name: str, cfg, test_prices: np.ndarray,
     # Scale features
     feat_scaled = scaler.transform(test_features)
 
-    # Precompute timestamp features for test period
-    from data_loader import compute_timestamp_features
-    ts_feats = compute_timestamp_features(
-        pd.DatetimeIndex(
-            pd.date_range(
-                start=pd.Timestamp("2000-01-01"),
-                periods=len(test_features),
-                freq="B"
-            )
-        )
-    )
+    # Precompute timestamp features for test period using actual test dates
+    from data_loader import compute_timestamp_features, build_features
+    # Rebuild the actual test index from the loaded data
+    test_start_idx = train_size + val_size
+    actual_test_index = features_df.index[test_start_idx:test_start_idx + len(test_features)]
+    ts_feats = compute_timestamp_features(pd.DatetimeIndex(actual_test_index))
 
     # Generate signals day by day
     signals = []
