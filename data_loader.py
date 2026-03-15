@@ -85,8 +85,13 @@ class ETFDataset(Dataset):
         X      = self.features[idx : idx + self.seq_len]
         p_next = self.prices[idx + self.seq_len]
         p_curr = self.prices[idx + self.seq_len - 1]
-        Y      = p_next - p_curr
-        return X, Y
+        prc_diff = p_next - p_curr                          # absolute price diff (PRC)
+        ret_diff = torch.where(                              # % return diff (RET)
+            p_curr > 0,
+            (p_next - p_curr) / p_curr.clamp(min=1e-8),
+            torch.zeros_like(p_curr)
+        )
+        return X, prc_diff, ret_diff
 
 
 # ── Main loader ───────────────────────────────────────────────────────────────
