@@ -627,6 +627,17 @@ def main():
                 "Final $10k →":   f"${m.get('final_value', 0):,.2f}" if isinstance(m.get('final_value'), float) else "N/A",
             }
 
+        # Use model n_days for B&H period — ensures fair comparison
+        # (B&H in old JSON files may have different n_days due to alignment bug)
+        model_n_days = 0
+        for variant, _ in VARIANTS:
+            m_check = models_data.get(variant, {}).get("metrics", {})
+            if m_check.get("n_days", 0) > 0:
+                model_n_days = m_check["n_days"]
+                break
+        if model_n_days > 0:
+            bh["n_days"] = model_n_days   # align B&H period to model period
+
         bh_total = bh.get('total_return_pct', bh.get('annual_return_pct', 0))
         rows.append(fmt_row("📈 Buy & Hold (baseline)", bh))
 
