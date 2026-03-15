@@ -54,5 +54,15 @@ CROSS_DROPOUT  = 0.2
 
 USE_HOLD     = False  # disable Hold node — forces model to always trade
 
+# ── Model variants to train ───────────────────────────────────────────────────
+# Each entry: (model_arch, loss_variant, loss_type)
+# loss_type: "PRC" = price diff (best in paper), "RET" = return % diff
+MODEL_VARIANTS = [
+    ("dlinear",     "L2", "PRC"),   # DLinear + StockLoss-L2 Price
+    ("crossformer", "L2", "PRC"),   # Crossformer + StockLoss-L2 Price
+    ("dlinear",     "L2", "RET"),   # DLinear + StockLoss-L2 Return
+    ("crossformer", "L2", "RET"),   # Crossformer + StockLoss-L2 Return
+]
+
 FEATURE_COLS = ["Close", "Volume"]
 N_ASSETS     = len(TICKERS)
