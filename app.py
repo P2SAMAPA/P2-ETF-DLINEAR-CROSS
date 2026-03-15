@@ -189,7 +189,7 @@ def generate_signals(module: str, model_name: str) -> pd.DataFrame | None:
 
     rows = []
     for i, ticker in enumerate(cfg.TICKERS):
-        signal    = "BUY" if O_n[i] > 0.1 else ("SHORT" if O_n[i] < -0.1 else "HOLD")
+        signal    = "BUY" if O_n[i] > 0.2 else ("SHORT" if O_n[i] < -0.2 else "HOLD")
         rows.append({
             "Ticker":      ticker,
             "Raw Output":  round(float(O_n[i]), 4),
@@ -238,7 +238,11 @@ def render_allocation_chart(df: pd.DataFrame):
 
 def render_portfolio_chart(eval_results: dict, model_name: str):
     bh  = eval_results.get("buy_and_hold", {}).get("portfolio_values", [])
-    mdl = eval_results.get("models", {}).get(model_name, {}).get("portfolio_values", [])
+    model_data_chart = eval_results.get("models", {}).get(model_name, {})
+    mdl = model_data_chart.get("portfolio_values", [])
+    # Also try bh_values from model entry if top-level bh is missing
+    if not bh:
+        bh = model_data_chart.get("bh_values", [])
 
     if not bh or not mdl:
         st.info("Portfolio value data not available.")
@@ -328,8 +332,8 @@ def main():
         if not eval_results:
             st.warning("Evaluation results not found. Run `evaluate.py` first.")
         else:
-            test_year = eval_results.get("test_year", "")
-            st.caption(f"Test year: {test_year}")
+            test_period = eval_results.get("test_period", eval_results.get("test_year", ""))
+            st.caption(f"Test period: {test_period}")
 
             # Buy & Hold metrics
             bh_metrics = eval_results.get("buy_and_hold", {}).get("metrics", {})
