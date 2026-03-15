@@ -27,6 +27,58 @@ from datetime import datetime
 # Ensure repo root is on path regardless of how the script is invoked
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+
+# ── Next US trading day helper ────────────────────────────────────────────────
+
+US_HOLIDAYS = {
+    # Fixed holidays (month, day)
+    (1, 1), (7, 4), (12, 25),
+}
+
+def is_us_holiday(d):
+    """Very rough US holiday check — covers major fixed holidays."""
+    # New Year's, Independence Day, Christmas
+    if (d.month, d.day) in US_HOLIDAYS:
+        return True
+    # Thanksgiving: 4th Thursday of November
+    if d.month == 11 and d.weekday() == 3:
+        count = (d.day - 1) // 7 + 1
+        if count == 4:
+            return True
+    # MLK Day: 3rd Monday of January
+    if d.month == 1 and d.weekday() == 0:
+        count = (d.day - 1) // 7 + 1
+        if count == 3:
+            return True
+    # Memorial Day: last Monday of May
+    if d.month == 5 and d.weekday() == 0 and d.day > 24:
+        return True
+    # Labor Day: 1st Monday of September
+    if d.month == 9 and d.weekday() == 0:
+        count = (d.day - 1) // 7 + 1
+        if count == 1:
+            return True
+    return False
+
+
+def next_trading_day():
+    """Return the next US market trading day from today (UTC)."""
+    from datetime import date, timedelta
+    d = date.today() + timedelta(days=1)
+    while d.weekday() >= 5 or is_us_holiday(d):
+        d += timedelta(days=1)
+    return d.strftime("%A, %B %d, %Y")
+
+
+def last_trading_day():
+    """Return the most recent completed US trading day."""
+    from datetime import date, timedelta
+    d = date.today()
+    # If today is weekend, go back to Friday
+    while d.weekday() >= 5 or is_us_holiday(d):
+        d -= timedelta(days=1)
+    return d.strftime("%A, %B %d, %Y")
+
 from data_loader import build_features
 from model import get_model
 import config_equity      as cfg_a
@@ -121,6 +173,7 @@ def load_eval_results(module: str) -> dict:
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_model_meta(module: str, model_name: str) -> dict:
+    # model_name is variant e.g. "dlinear_prc"
     path = latest_dated_file(RESULTS_MAP[module], f"{model_name}_meta", ".json")
     if not path:
         return {}
@@ -148,6 +201,7 @@ def generate_signals(module: str, model_name: str,
     """
     cfg = cfg_a if module == "A" else cfg_b
 
+    # model_name is now a variant like "dlinear_prc" or "crossformer_ret"
     weight_path = latest_dated_file(RESULTS_MAP[module], f"{model_name}_best", ".pt")
     scaler_path = latest_dated_file(RESULTS_MAP[module], "scaler", ".pkl")
 
@@ -290,7 +344,17 @@ def main():
         module_label = st.selectbox("Module", list(MODULE_MAP.keys()))
         module, cfg  = MODULE_MAP[module_label]
 
-        model_name = st.selectbox("Model", ["dlinear", "crossformer"])
+        model_name = st.selectbox("Model", [
+            "dlinear_prc",
+            "crossformer_prc",
+            "dlinear_ret",
+            "crossformer_ret",
+        ], format_func=lambda x: {
+            "dlinear_prc":     "DLinear + Price Loss (PRC)",
+            "crossformer_prc": "Crossformer + Price Loss (PRC)",
+            "dlinear_ret":     "DLinear + Return Loss (RET)",
+            "crossformer_ret": "Crossformer + Return Loss (RET)",
+        }.get(x, x))
 
         st.divider()
         hf_meta = load_hf_metadata(module)
@@ -320,16 +384,22 @@ def main():
     # ── Tab 1: Next-Day Signals ───────────────────────────────────────────────
     with tab1:
         st.subheader(f"Next Trading Day Signals — {module_label}")
-        st.caption(f"Based on last {cfg.SEQ_LEN} trading days of data")
+        data_thru = hf_meta.get("last_data_update", "N/A")
+        st.caption(f"Model trained on data through: {data_thru} | Using last {cfg.SEQ_LEN} trading days for inference")
 
         hf_meta    = load_hf_metadata(module)
         cache_key  = hf_meta.get("last_data_update", "")
+
+        next_day  = next_trading_day()
+        last_day  = last_trading_day()
+        st.info(f"📅 **Prediction for:** {next_day}  |  Based on data through: {last_day}")
+
         with st.spinner("Loading model and computing signals (first load may take ~30s)..."):
             signals_df = generate_signals(module, model_name, cache_key)
 
         if signals_df is None:
             st.warning(
-                "Model weights not found. Please run training first via GitHub Actions "
+                "Model weights not found or incompatible. Please run training first via GitHub Actions "
                 "(`train_equity.yml` or `train_fixed_income.yml`)."
             )
         else:
@@ -385,9 +455,11 @@ def main():
 
         with col1:
             st.markdown("**Architecture Details**")
-            if model_name == "dlinear":
+            arch = model_name.split("_")[0]   # "dlinear" or "crossformer"
+        loss_type = model_name.split("_")[1].upper() if "_" in model_name else "PRC"
+        if arch == "dlinear":
                 st.markdown(f"""
-- **Model**: DLinear
+- **Model**: DLinear ({loss_type} loss)
 - **Decomposition**: Seasonal-Trend (kernel=25)
 - **Seq Length**: {cfg.SEQ_LEN} trading days
 - **Output**: {cfg.N_ASSETS}+1 neurons (tanh)
