@@ -346,11 +346,16 @@ def main():
         scaler = pickle.load(f)
     print(f"📐 Loaded scaler from {os.path.basename(scaler_path)}")
 
-    # Buy & Hold over test period
-    bh_portfolio = buy_and_hold(test_prices)
-    bh_metrics   = compute_metrics(bh_portfolio)
-    print(f"\n📊 Buy & Hold baseline ({test_period}):")
-    print(f"   Annual Return : {bh_metrics['annual_return_pct']:.2f}%")
+    # Align Buy & Hold to the same window as model signals
+    # Models start after seq_len rows (need full lookback window first)
+    # so Buy & Hold must start from the same point for fair comparison
+    aligned_prices = test_prices[cfg.SEQ_LEN - 1:]
+    bh_portfolio   = buy_and_hold(aligned_prices)
+    bh_metrics     = compute_metrics(bh_portfolio)
+    print(f"\n📊 Buy & Hold baseline ({test_period}, aligned to model window):")
+    print(f"   Trading days  : {bh_metrics['n_days']}")
+    print(f"   Total Return  : {bh_metrics['total_return_pct']:.2f}%")
+    print(f"   CAGR          : {bh_metrics['annual_return_pct']:.2f}%")
     print(f"   Sharpe Ratio  : {bh_metrics['sharpe_ratio']:.3f}")
     print(f"   Max Drawdown  : {bh_metrics['max_drawdown_pct']:.2f}%")
 
