@@ -1,5 +1,5 @@
 """
-archive_current.py — ONE-TIME script
+archive_current.py - ONE-TIME script
 =====================================
 Run this ONCE manually before triggering Phase 2b (300-epoch) training
 to preserve the current Phase 2a results (50 epochs, test=0.10, with XES).
@@ -40,7 +40,7 @@ def archive_module(module: str, cfg: dict):
 
     copied = []
     for fname in os.listdir(src_dir):
-        # Copy JSON files only — weights too large for archive
+        # Copy JSON files only - weights too large for archive
         if fname.endswith(".json"):
             shutil.copy2(os.path.join(src_dir, fname),
                         os.path.join(arch_dir, fname))
@@ -48,12 +48,12 @@ def archive_module(module: str, cfg: dict):
 
     # Write phase README
     with open(os.path.join(arch_dir, "PHASE_INFO.md"), "w") as f:
-        f.write(f"# Archive: {PHASE_LABEL} — Module {module}\n\n")
+        f.write(f"# Archive: {PHASE_LABEL} - Module {module}\n\n")
         f.write(f"**Archived on**: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}\n\n")
         f.write(f"**Epochs**: {cfg['epochs']}\n\n")
         f.write(f"**Test ratio**: {cfg['test_ratio']} ({int(cfg['test_ratio']*100)}%)\n\n")
         f.write(f"**Tickers**: {cfg['tickers']}\n\n")
-        f.write(f"**Phase**: 2a — initial run with XES, lower epochs\n\n")
+        f.write(f"**Phase**: 2a - initial run with XES, lower epochs\n\n")
         f.write(f"**Files**: {copied}\n\n")
         f.write("## Key Results\n\n")
         f.write("See eval_results_*.json for full backtest metrics.\n\n")
