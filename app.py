@@ -787,12 +787,9 @@ It looks at three things across all test days:
                     st.markdown(line)
 
         # ── Section 2c: Walk-forward MoLE results ────────────────────────────
-        wf_path = os.path.join(cfg.RESULTS_DIR,
-                               sorted([f for f in os.listdir(cfg.RESULTS_DIR)
-                                       if f.startswith("mole_ret_walkforward_")
-                                       and f.endswith(".json")],
-                                      reverse=True)[0])                   if any(f.startswith("mole_ret_walkforward_")
-                         for f in os.listdir(cfg.RESULTS_DIR)) else None
+        _wf_files = [f for f in os.listdir(cfg.RESULTS_DIR)
+                     if f.startswith("mole_ret_walkforward_") and f.endswith(".json")]
+        wf_path = os.path.join(cfg.RESULTS_DIR, sorted(_wf_files, reverse=True)[0])                   if _wf_files else None
 
         if wf_path:
             st.divider()
