@@ -170,7 +170,7 @@ def train_fold(fold_idx, features_df, prices_df, fold_dates, cfg, device):
         val_ds,   batch_size=cfg.BATCH_SIZE, shuffle=False)
 
     n_features = feat_train.shape[1]
-    model = get_model("mole", "RET", cfg, n_features).to(device)
+    model = get_model("mole_ret", cfg).to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg.LR)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
