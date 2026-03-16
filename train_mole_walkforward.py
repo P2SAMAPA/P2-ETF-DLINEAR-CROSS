@@ -34,7 +34,8 @@ from sklearn.preprocessing import StandardScaler
 
 from data_loader import build_features, compute_timestamp_features
 from model import get_model
-from loss_functions import stock_loss_l2
+from loss_functions import get_loss_fn
+loss_fn_global = get_loss_fn("L2")
 from evaluate import compute_metrics, buy_and_hold, buy_and_hold_single
 
 
@@ -190,7 +191,7 @@ def train_fold(fold_idx, features_df, prices_df, fold_dates, cfg, device):
             X, ts, Y = X.to(device), ts.to(device), ret_diff.to(device)
             optimizer.zero_grad()
             O = model(X, ts)
-            loss = stock_loss_l2(O, Y, gamma=cfg.GAMMA,
+            loss = loss_fn_global(O, Y, gamma=cfg.GAMMA,
                                  use_hold=getattr(cfg, 'USE_HOLD', False))
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -205,7 +206,7 @@ def train_fold(fold_idx, features_df, prices_df, fold_dates, cfg, device):
             for X, ts, ret_diff in val_loader:
                 X, ts, Y = X.to(device), ts.to(device), ret_diff.to(device)
                 O = model(X, ts)
-                val_loss += stock_loss_l2(O, Y, gamma=cfg.GAMMA,
+                val_loss += loss_fn_global(O, Y, gamma=cfg.GAMMA,
                                           use_hold=getattr(cfg, 'USE_HOLD', False)).item()
         val_loss /= len(val_loader)
         scheduler.step(val_loss)
