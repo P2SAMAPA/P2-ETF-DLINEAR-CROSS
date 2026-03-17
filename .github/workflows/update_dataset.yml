@@ -1,32 +1,29 @@
 # update_dataset.yml — P2-ETF-DLINEAR-CROSS
-# DAILY workflow to append the latest trading day to the HF dataset.
-# Runs after US market close (21:30 UTC = 5:30pm ET).
-# Also supports manual trigger with module selection.
+# DAILY workflow to append the latest trading day's OHLCV data to HF dataset.
+# Scheduled: Runs Mon-Fri after US market close.
+# Manual: User chooses specific action.
 
 name: Update Dataset (Daily)
 
 on:
   schedule:
-    - cron: "30 21 * * 1-5"   # Mon–Fri at 21:30 UTC (after US market close)
+    - cron: "30 21 * * 1-5"
   workflow_dispatch:
     inputs:
-      module:
-        description: "Module to update: A (equity), B (fixed income), or both"
+      action:
+        description: "Action to run"
         required: true
-        default: "both"
+        default: "dataset_update"
         type: choice
         options:
-          - both
-          - A
-          - B
+          - dataset_update
+          - module_A
+          - module_B
 
 jobs:
   update:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-
-    env:
-      HF_TOKEN: ${{ secrets.HF_TOKEN }}
 
     steps:
       - name: Checkout repository
@@ -41,20 +38,20 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run update — Both modules (scheduled)
-        if: github.event_name == 'schedule' || github.event.inputs.module == 'both'
+      - name: Run — Dataset Update (Both Modules)
+        if: github.event_name == 'schedule' || github.event.inputs.action == 'dataset_update'
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: python update_dataset.py
 
-      - name: Run update — Module A (Equity) only
-        if: github.event.inputs.module == 'A'
+      - name: Run — Module A (Equity) only
+        if: github.event.inputs.action == 'module_A'
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: python update_dataset.py --module A
 
-      - name: Run update — Module B (Fixed Income) only
-        if: github.event.inputs.module == 'B'
+      - name: Run — Module B (Fixed Income) only
+        if: github.event.inputs.action == 'module_B'
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: python update_dataset.py --module B
