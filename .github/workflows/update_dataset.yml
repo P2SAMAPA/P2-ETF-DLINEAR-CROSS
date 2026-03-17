@@ -1,9 +1,7 @@
 # update_dataset.yml — P2-ETF-DLINEAR-CROSS
-# DAILY workflow to append the latest trading day's OHLCV data to HF dataset.
-# Scheduled: Runs Mon-Fri after US market close.
-# Manual: User chooses specific action.
+# DEBUG VERSION with full logging and artifact capture
 
-name: Update Dataset (Daily)
+name: Update Dataset (Daily) — DEBUG
 
 on:
   schedule:
@@ -36,25 +34,65 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          pip show huggingface-hub
 
-      - name: Run — Dataset Update (Both Modules)
+      - name: Verify HF Authentication
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python -c "
+          import os
+          from huggingface_hub import whoami
+          token = os.getenv('HF_TOKEN')
+          print(f'Token length: {len(token) if token else 0}')
+          try:
+              user = whoami(token=token)
+              print(f'✅ HF Auth OK: {user[\"name\"]}')
+              print(f'   Permissions: {user.get(\"auth\", {}).get(\"accessToken\", {}).get(\"role\", \"unknown\")}')
+          except Exception as e:
+              print(f'❌ HF Auth Failed: {e}')
+              exit(1)
+          "
+
+      - name: Run — Dataset Update (Both Modules) with DEBUG
         if: github.event_name == 'schedule' || github.event.inputs.action == 'dataset_update'
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: python update_dataset.py
+        run: |
+          python update_dataset.py 2>&1 | tee update_log.txt
+          echo "=== SCRIPT EXIT CODE: $? ==="
 
-      - name: Run — Module A (Equity) only
+      - name: Run — Module A (Equity) only with DEBUG
         if: github.event.inputs.action == 'module_A'
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: python update_dataset.py --module A
+        run: |
+          python update_dataset.py --module A 2>&1 | tee update_log.txt
+          echo "=== SCRIPT EXIT CODE: $? ==="
 
-      - name: Run — Module B (Fixed Income) only
+      - name: Run — Module B (Fixed Income) only with DEBUG
         if: github.event.inputs.action == 'module_B'
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: python update_dataset.py --module B
+        run: |
+          python update_dataset.py --module B 2>&1 | tee update_log.txt
+          echo "=== SCRIPT EXIT CODE: $? ==="
+
+      - name: Upload debug logs (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-logs-${{ github.run_id }}
+          path: |
+            update_log.txt
+            *.parquet
+            *.json
 
       - name: Log completion
-        run: echo "✅ Dataset update complete at $(date -u)"
+        if: always()
+        run: |
+          echo "✅ Workflow completed at $(date -u)"
+          echo "Run ID: ${{ github.run_id }}"
+          echo "Download logs from: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
