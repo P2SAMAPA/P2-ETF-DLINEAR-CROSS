@@ -41,17 +41,30 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Clone HF Dataset repository
+        run: |
+          git clone https://user:${{ secrets.HF_TOKEN }}@huggingface.co/datasets/P2SAMAPA/etf-dlinear-cross-data.git hf_dataset
+
       - name: Run update — Both modules (scheduled)
         if: ${{ github.event_name == 'schedule' || github.event.inputs.module == 'both' }}
-        run: python update_dataset.py
+        run: python update_dataset.py --data-dir ./hf_dataset
 
       - name: Run update — Module A (Equity) only
         if: ${{ github.event.inputs.module == 'A' }}
-        run: python update_dataset.py --module A
+        run: python update_dataset.py --module A --data-dir ./hf_dataset
 
       - name: Run update — Module B (Fixed Income) only
         if: ${{ github.event.inputs.module == 'B' }}
-        run: python update_dataset.py --module B
+        run: python update_dataset.py --module B --data-dir ./hf_dataset
+
+      - name: Commit and push updated data to HF
+        run: |
+          cd hf_dataset
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Update OHLCV data: $(date -u +%Y-%m-%d)" || echo "No changes to commit"
+          git push https://user:${{ secrets.HF_TOKEN }}@huggingface.co/datasets/P2SAMAPA/etf-dlinear-cross-data.git
 
       - name: Log completion
         run: echo "✅ Dataset update complete at $(date -u)"
