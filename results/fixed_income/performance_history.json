@@ -107,11 +107,11 @@
         "n_years": 2.33
       },
       "crossformer_prc": {
-        "total_return_pct": 147.6319,
+        "total_return_pct": 147.6318,
         "annual_return_pct": 47.5916,
         "sharpe_ratio": 2.0497,
         "max_drawdown_pct": -13.5875,
-        "final_value": 24763.19,
+        "final_value": 24763.18,
         "initial_value": 10000.0,
         "n_days": 587,
         "n_years": 2.33
