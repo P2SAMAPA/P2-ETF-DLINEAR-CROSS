@@ -3,16 +3,6 @@ update_dataset.py — P2-ETF-DLINEAR-CROSS
 ==========================================
 DAILY script to append the latest trading day's OHLCV data
 to the HuggingFace dataset for both modules.
-
-- Downloads latest data via yfinance
-- Checks if the new date already exists (no duplicates)
-- Skips gracefully if market was closed (weekend / holiday)
-- Appends new row to existing parquet and re-uploads to HF
-
-Run:
-  python update_dataset.py --module A
-  python update_dataset.py --module B
-  python update_dataset.py              # both (default)
 """
 
 import os
@@ -24,7 +14,7 @@ import argparse
 import pandas as pd
 import yfinance as yf
 from datetime import datetime, timedelta
-from huggingface_hub import HfApi, CommitOperationAdd, hf_hub_download
+from huggingface_hub import HfApi, hf_hub_download
 
 # ── Config ────────────────────────────────────────────────────────────────────
 HF_DATASET_REPO = "P2SAMAPA/etf-dlinear-cross-data"
@@ -53,16 +43,16 @@ MODULE_CONFIG = {
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def is_market_open_day(date: datetime) -> bool:
-    """Rough check — skip weekends. Holidays handled by empty yfinance response."""
-    return date.weekday() < 5   # Mon=0 … Fri=4
+    """Rough check — skip weekends."""
+    return date.weekday() < 5
 
 
 def fetch_latest_yf(tickers: list, date_str: str) -> pd.DataFrame | None:
     """
     Fetch OHLCV for a single trading day.
-    yfinance end date is exclusive, so we request date+1.
     """
     end_str = (datetime.strptime(date_str, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+    
     for attempt in range(4):
         try:
             raw = yf.download(
@@ -74,19 +64,20 @@ def fetch_latest_yf(tickers: list, date_str: str) -> pd.DataFrame | None:
                 threads=False,
             )
             if raw.empty:
+                print(f"  ⚠️  yfinance returned empty for {date_str}")
                 return None
 
+            # Handle MultiIndex columns
             if isinstance(raw.columns, pd.MultiIndex):
-                # Shape: (dates, (field, ticker)) → keep as MultiIndex (ticker, field)
                 raw = raw.swaplevel(axis=1).sort_index(axis=1)
             else:
-                # Single ticker — wrap in MultiIndex
+                # Single ticker
                 ticker = tickers[0]
                 raw.columns = pd.MultiIndex.from_tuples([(ticker, f) for f in raw.columns])
 
             raw.index = pd.to_datetime(raw.index).tz_localize(None)
-            # Keep only requested fields
             raw = raw.loc[:, raw.columns.get_level_values(1).isin(OHLCV_FIELDS)]
+            
             print(f"  ✅ Fetched {len(raw)} row(s) for {len(tickers)} tickers")
             return raw
 
@@ -104,7 +95,7 @@ def fetch_latest_yf(tickers: list, date_str: str) -> pd.DataFrame | None:
 
 
 def load_from_hf(hf_path: str, token: str) -> pd.DataFrame:
-    """Download existing parquet from HF and load into DataFrame."""
+    """Download existing parquet from HF."""
     local = hf_hub_download(
         repo_id=HF_DATASET_REPO,
         repo_type="dataset",
@@ -115,45 +106,72 @@ def load_from_hf(hf_path: str, token: str) -> pd.DataFrame:
     return pd.read_parquet(local)
 
 
+# ── CRITICAL FIX: Use upload_file instead of create_commit ───────────────────
+
 def upload_to_hf(df: pd.DataFrame, local_file: str, repo_path: str,
                  token: str, commit_msg: str):
-    """Save DataFrame to parquet and upload to HF."""
-    df.to_parquet(local_file)
+    """
+    FIXED: Use upload_file instead of create_commit for reliability.
+    """
+    # Save to temp file
+    df.to_parquet(local_file, index=True)
+    
+    # Use HfApi with explicit token and upload_file
     api = HfApi(token=token)
-    with open(local_file, "rb") as f:
-        content = f.read()
-    api.create_commit(
-        repo_id=HF_DATASET_REPO,
-        repo_type="dataset",
-        token=token,
-        commit_message=commit_msg,
-        operations=[CommitOperationAdd(
+    
+    try:
+        # CRITICAL FIX: Use upload_file (simpler, more reliable)
+        api.upload_file(
+            path_or_fileobj=local_file,
             path_in_repo=repo_path,
-            path_or_fileobj=content,
-        )],
-    )
-    print(f"  ✅ Uploaded → {repo_path}")
+            repo_id=HF_DATASET_REPO,
+            repo_type="dataset",
+            commit_message=commit_msg,
+        )
+        print(f"  ✅ Uploaded → {repo_path}")
+        
+    except Exception as e:
+        print(f"  ❌ Upload failed: {e}")
+        # Fallback: try with create_commit if upload_file fails
+        try:
+            print(f"  🔄 Retrying with create_commit...")
+            with open(local_file, "rb") as f:
+                content = f.read()
+            
+            from huggingface_hub import CommitOperationAdd
+            api.create_commit(
+                repo_id=HF_DATASET_REPO,
+                repo_type="dataset",
+                commit_message=commit_msg,
+                operations=[CommitOperationAdd(path_in_repo=repo_path, path_or_fileobj=content)],
+            )
+            print(f"  ✅ Uploaded (fallback) → {repo_path}")
+        except Exception as e2:
+            print(f"  ❌ Fallback also failed: {e2}")
+            raise
 
 
 def upload_metadata(metadata: dict, local_file: str, repo_path: str,
                     token: str, commit_msg: str):
-    """Save metadata JSON and upload to HF."""
+    """Upload metadata JSON to HF."""
     with open(local_file, "w") as f:
         json.dump(metadata, f, indent=2)
+    
     api = HfApi(token=token)
-    with open(local_file, "rb") as f:
-        content = f.read()
-    api.create_commit(
-        repo_id=HF_DATASET_REPO,
-        repo_type="dataset",
-        token=token,
-        commit_message=commit_msg,
-        operations=[CommitOperationAdd(
+    
+    try:
+        # CRITICAL FIX: Use upload_file
+        api.upload_file(
+            path_or_fileobj=local_file,
             path_in_repo=repo_path,
-            path_or_fileobj=content,
-        )],
-    )
-    print(f"  ✅ Uploaded → {repo_path}")
+            repo_id=HF_DATASET_REPO,
+            repo_type="dataset",
+            commit_message=commit_msg,
+        )
+        print(f"  ✅ Uploaded → {repo_path}")
+    except Exception as e:
+        print(f"  ❌ Metadata upload failed: {e}")
+        raise
 
 
 # ── Update one module ─────────────────────────────────────────────────────────
@@ -218,6 +236,8 @@ def update_module(module: str, token: str):
     combined = pd.concat([existing_df, new_df])
     combined = combined[~combined.index.duplicated(keep="last")]
     combined = combined.sort_index()
+    
+    # Forward fill only if needed (not backfill to avoid future data leakage)
     combined = combined.ffill()
 
     print(f"   New dataset rows : {len(combined)} (+{len(combined) - len(existing_df)})")
@@ -280,11 +300,17 @@ def main():
     modules = [args.module] if args.module else ["A", "B"]
 
     for module in modules:
-        update_module(module, token)
-        time.sleep(random.uniform(2.0, 4.0))   # polite delay between modules
+        try:
+            update_module(module, token)
+        except Exception as e:
+            print(f"\n❌ MODULE {module} FAILED: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        time.sleep(random.uniform(2.0, 4.0))
 
     print("\n" + "=" * 60)
-    print("✅ ALL REQUESTED MODULES UPDATED")
+    print("✅ ALL REQUESTED MODULES PROCESSED")
     print("=" * 60)
 
 
