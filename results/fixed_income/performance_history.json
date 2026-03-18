@@ -173,11 +173,11 @@
         "n_years": 2.33
       },
       "dlinear_ret": {
-        "total_return_pct": 254.5761,
+        "total_return_pct": 254.5759,
         "annual_return_pct": 72.1833,
         "sharpe_ratio": 1.5088,
         "max_drawdown_pct": -37.1496,
-        "final_value": 35457.61,
+        "final_value": 35457.59,
         "initial_value": 10000.0,
         "n_days": 587,
         "n_years": 2.33
