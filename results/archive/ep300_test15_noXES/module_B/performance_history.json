@@ -473,5 +473,117 @@
         "n_years": 2.33
       }
     }
+  },
+  {
+    "run_date": "20260325",
+    "test_period": "2023-07-03 \u2192 2026-03-24 (684 rows)",
+    "buy_and_hold": {
+      "total_return_pct": 46.2556,
+      "annual_return_pct": 17.6962,
+      "sharpe_ratio": 1.6496,
+      "max_drawdown_pct": -8.9096,
+      "final_value": 14625.56,
+      "initial_value": 10000.0,
+      "n_days": 588,
+      "n_years": 2.33
+    },
+    "models": {
+      "dlinear_prc": {
+        "total_return_pct": 122.4398,
+        "annual_return_pct": 40.948,
+        "sharpe_ratio": 1.7538,
+        "max_drawdown_pct": -18.5239,
+        "final_value": 22243.98,
+        "initial_value": 10000.0,
+        "n_days": 587,
+        "n_years": 2.33
+      },
+      "crossformer_prc": {
+        "total_return_pct": 118.3166,
+        "annual_return_pct": 39.8204,
+        "sharpe_ratio": 1.7503,
+        "max_drawdown_pct": -18.0769,
+        "final_value": 21831.66,
+        "initial_value": 10000.0,
+        "n_days": 587,
+        "n_years": 2.33
+      },
+      "dlinear_ret": {
+        "total_return_pct": 191.2353,
+        "annual_return_pct": 58.2343,
+        "sharpe_ratio": 1.301,
+        "max_drawdown_pct": -41.7424,
+        "final_value": 29123.53,
+        "initial_value": 10000.0,
+        "n_days": 587,
+        "n_years": 2.33
+      },
+      "crossformer_ret": {
+        "total_return_pct": 190.989,
+        "annual_return_pct": 58.1769,
+        "sharpe_ratio": 1.301,
+        "max_drawdown_pct": -41.7052,
+        "final_value": 29098.9,
+        "initial_value": 10000.0,
+        "n_days": 587,
+        "n_years": 2.33
+      }
+    }
+  },
+  {
+    "run_date": "20260326",
+    "test_period": "2023-07-03 \u2192 2026-03-25 (685 rows)",
+    "buy_and_hold": {
+      "total_return_pct": 47.9466,
+      "annual_return_pct": 18.2438,
+      "sharpe_ratio": 1.6926,
+      "max_drawdown_pct": -8.9096,
+      "final_value": 14794.66,
+      "initial_value": 10000.0,
+      "n_days": 589,
+      "n_years": 2.34
+    },
+    "models": {
+      "dlinear_prc": {
+        "total_return_pct": 122.4895,
+        "annual_return_pct": 40.8792,
+        "sharpe_ratio": 1.7527,
+        "max_drawdown_pct": -18.5239,
+        "final_value": 22248.95,
+        "initial_value": 10000.0,
+        "n_days": 588,
+        "n_years": 2.33
+      },
+      "crossformer_prc": {
+        "total_return_pct": 120.0616,
+        "annual_return_pct": 40.2183,
+        "sharpe_ratio": 1.751,
+        "max_drawdown_pct": -18.2606,
+        "final_value": 22006.16,
+        "initial_value": 10000.0,
+        "n_days": 588,
+        "n_years": 2.33
+      },
+      "dlinear_ret": {
+        "total_return_pct": 193.473,
+        "annual_return_pct": 58.6304,
+        "sharpe_ratio": 1.3076,
+        "max_drawdown_pct": -41.7424,
+        "final_value": 29347.3,
+        "initial_value": 10000.0,
+        "n_days": 588,
+        "n_years": 2.33
+      },
+      "crossformer_ret": {
+        "total_return_pct": 151.2025,
+        "annual_return_pct": 48.4017,
+        "sharpe_ratio": 1.2925,
+        "max_drawdown_pct": -35.0487,
+        "final_value": 25120.25,
+        "initial_value": 10000.0,
+        "n_days": 588,
+        "n_years": 2.33
+      }
+    }
   }
 ]
