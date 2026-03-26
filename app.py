@@ -22,13 +22,13 @@ import streamlit as st
 import plotly.graph_objects as go
 import plotly.express as px
 from huggingface_hub import hf_hub_download
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Ensure repo root is on path regardless of how the script is invoked
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
-# ── Next US trading day helper ────────────────────────────────────────────────
+# ── Next US trading day helper (modified to accept a reference date) ──────────
 
 US_HOLIDAYS = {
     # Fixed holidays (month, day)
@@ -37,7 +37,6 @@ US_HOLIDAYS = {
 
 def is_us_holiday(d):
     """Very rough US holiday check — covers major fixed holidays."""
-    # New Year's, Independence Day, Christmas
     if (d.month, d.day) in US_HOLIDAYS:
         return True
     # Thanksgiving: 4th Thursday of November
@@ -61,23 +60,25 @@ def is_us_holiday(d):
     return False
 
 
-def next_trading_day():
-    """Return the next US market trading day from today (UTC)."""
-    from datetime import date, timedelta
-    d = date.today() + timedelta(days=1)
+def next_trading_day_from_date(date):
+    """Return the next US market trading day after the given date."""
+    d = date + timedelta(days=1)
     while d.weekday() >= 5 or is_us_holiday(d):
         d += timedelta(days=1)
-    return d.strftime("%A, %B %d, %Y")
+    return d
 
 
-def last_trading_day():
-    """Return the most recent completed US trading day."""
-    from datetime import date, timedelta
-    d = date.today()
-    # If today is weekend, go back to Friday
+def last_trading_day_from_date(date):
+    """Return the most recent completed trading day on or before the given date."""
+    d = date
     while d.weekday() >= 5 or is_us_holiday(d):
         d -= timedelta(days=1)
+    return d
+
+
+def format_date(d):
     return d.strftime("%A, %B %d, %Y")
+
 
 from data_loader import build_features
 from model import get_model
@@ -173,7 +174,6 @@ def load_eval_results(module: str) -> dict:
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_model_meta(module: str, model_name: str) -> dict:
-    # model_name is variant e.g. "dlinear_prc"
     path = latest_dated_file(RESULTS_MAP[module], f"{model_name}_meta", ".json")
     if not path:
         return {}
@@ -190,7 +190,7 @@ def load_performance_history(module: str) -> list:
         return json.load(f)
 
 
-# ── Signal generation ─────────────────────────────────────────────────────────
+# ── Signal generation (unchanged) ────────────────────────────────────────────
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def generate_signals(module: str, model_name: str,
@@ -201,21 +201,17 @@ def generate_signals(module: str, model_name: str,
     """
     cfg = cfg_a if module == "A" else cfg_b
 
-    # model_name is now a variant like "dlinear_prc" or "crossformer_ret"
     weight_path = latest_dated_file(RESULTS_MAP[module], f"{model_name}_best", ".pt")
     scaler_path = latest_dated_file(RESULTS_MAP[module], "scaler", ".pkl")
 
     if not weight_path or not scaler_path:
         return None
 
-    # Load scaler first — cheap local file
     with open(scaler_path, "rb") as f:
         scaler = pickle.load(f)
 
-    # Use already-cached OHLCV — avoids re-downloading from HF
     ohlcv_df = load_ohlcv(module)
 
-    # Build features — only need last seq_len + 30 rows for speed
     tail_df = ohlcv_df.iloc[-(cfg.SEQ_LEN + 50):]
     features_df, prices_df = build_features(tail_df, cfg.TICKERS)
     valid = features_df.dropna().index.intersection(prices_df.dropna().index)
@@ -227,7 +223,6 @@ def generate_signals(module: str, model_name: str,
     recent        = features_df.iloc[-cfg.SEQ_LEN:].values
     recent_scaled = scaler.transform(recent)
 
-    # Model forward pass — CPU only
     device = torch.device("cpu")
     model  = get_model(model_name, cfg).to(device)
     try:
@@ -235,18 +230,15 @@ def generate_signals(module: str, model_name: str,
             torch.load(weight_path, map_location=device, weights_only=True)
         )
     except RuntimeError:
-        # Weight mismatch — old weights incompatible with new architecture
-        # Happens when USE_HOLD changed. Re-train to fix.
         return None
     model.eval()
 
-    # Build timestamp mark for most recent window start
     from data_loader import compute_timestamp_features
     recent_idx   = ohlcv_df.iloc[-(cfg.SEQ_LEN + 50):].index
     valid_idx    = features_df.index
     window_start = valid_idx[-cfg.SEQ_LEN]
     ts_arr       = compute_timestamp_features(pd.DatetimeIndex([window_start]))
-    ts_mark      = torch.tensor(ts_arr, dtype=torch.float32)   # (1, 4)
+    ts_mark      = torch.tensor(ts_arr, dtype=torch.float32)
 
     import inspect as _inspect
     X = torch.tensor(recent_scaled, dtype=torch.float32).unsqueeze(0)
@@ -255,7 +247,7 @@ def generate_signals(module: str, model_name: str,
         if 'ts_mark' in sig.parameters:
             O = model(X, ts_mark).squeeze(0).numpy()
         else:
-            O = model(X).squeeze(0).numpy()    # (N+1,)
+            O = model(X).squeeze(0).numpy()
 
     use_hold = getattr(cfg, 'USE_HOLD', False)
     N        = cfg.N_ASSETS
@@ -285,7 +277,7 @@ def generate_signals(module: str, model_name: str,
     return pd.DataFrame(rows)
 
 
-# ── UI helpers ────────────────────────────────────────────────────────────────
+# ── UI helpers (unchanged) ────────────────────────────────────────────────────
 
 def signal_color(signal: str) -> str:
     return {"BUY": "🟢", "SHORT": "🔴", "HOLD": "🟡"}.get(signal, "⚪")
@@ -317,7 +309,6 @@ def render_portfolio_chart(eval_results: dict, model_name: str):
     bh  = eval_results.get("buy_and_hold", {}).get("portfolio_values", [])
     model_data_chart = eval_results.get("models", {}).get(model_name, {})
     mdl = model_data_chart.get("portfolio_values", [])
-    # Also try bh_values from model entry if top-level bh is missing
     if not bh:
         bh = model_data_chart.get("bh_values", [])
 
@@ -352,6 +343,23 @@ def render_metrics_cards(metrics: dict, label: str):
     c2.metric("CAGR (Annualised)", cagr_str)
     c3.metric("Sharpe Ratio",      f"{metrics.get('sharpe_ratio', 'N/A')}")
     c4.metric("Max Drawdown",      f"{metrics.get('max_drawdown_pct', 'N/A')}%")
+
+
+# ── Helper to get prediction date from evaluation results ─────────────────────
+def get_prediction_date_from_eval(eval_results: dict) -> tuple:
+    """Return (last_data_date, prediction_date) as datetime objects."""
+    test_period = eval_results.get("test_period", "")
+    # Expected format: "YYYY-MM-DD → YYYY-MM-DD (X rows)"
+    import re
+    match = re.search(r"(\d{4}-\d{2}-\d{2})\s*→\s*(\d{4}-\d{2}-\d{2})", test_period)
+    if match:
+        end_str = match.group(2)
+        last_data = pd.to_datetime(end_str).date()
+        pred_date = next_trading_day_from_date(pd.Timestamp(last_data)).date()
+        return last_data, pred_date
+    # Fallback: use today
+    today = pd.Timestamp.today().date()
+    return today, next_trading_day_from_date(pd.Timestamp(today)).date()
 
 
 # ── Main app ──────────────────────────────────────────────────────────────────
@@ -408,16 +416,21 @@ def main():
     # ── Tab 1: Next-Day Signals ───────────────────────────────────────────────
     with tab1:
         st.subheader(f"Next Trading Day Signals — {module_label}")
-        data_thru = hf_meta.get("last_data_update", "N/A")
-        st.caption(f"Model trained on data through: {data_thru} | Using last {cfg.SEQ_LEN} trading days for inference")
+        hf_meta = load_hf_metadata(module)
+        last_data_str = hf_meta.get("last_data_update", "N/A")
+        if last_data_str != "N/A":
+            try:
+                last_data_date = pd.to_datetime(last_data_str).date()
+                pred_date = next_trading_day_from_date(pd.Timestamp(last_data_date)).date()
+                data_thru_str = format_date(last_data_date)
+                pred_str = format_date(pred_date)
+                st.info(f"📅 **Prediction for:** {pred_str}  |  Based on data through: {data_thru_str}")
+            except Exception:
+                st.info(f"📅 **Prediction for:** {next_trading_day_from_date(pd.Timestamp.today()).strftime('%A, %B %d, %Y')}  |  Data through: {last_data_str}")
+        else:
+            st.info(f"📅 **Prediction for:** {next_trading_day_from_date(pd.Timestamp.today()).strftime('%A, %B %d, %Y')}  |  Data through: last available")
 
-        hf_meta    = load_hf_metadata(module)
-        cache_key  = hf_meta.get("last_data_update", "")
-
-        next_day  = next_trading_day()
-        last_day  = last_trading_day()
-        st.info(f"📅 **Prediction for:** {next_day}  |  Based on data through: {last_day}")
-
+        cache_key = hf_meta.get("last_data_update", "")
         with st.spinner("Loading model and computing signals (first load may take ~30s)..."):
             signals_df = generate_signals(module, model_name, cache_key)
 
@@ -430,7 +443,7 @@ def main():
             render_signals_table(signals_df)
             render_allocation_chart(signals_df)
 
-    # ── Tab 2: Backtest Performance ───────────────────────────────────────────
+    # ── Tab 2: Backtest Performance (unchanged) ───────────────────────────────
     with tab2:
         st.subheader(f"Backtest Performance — {module_label}")
         eval_results = load_eval_results(module)
@@ -441,7 +454,6 @@ def main():
             test_period = eval_results.get("test_period", eval_results.get("test_year", ""))
             st.caption(f"Test period: {test_period}")
 
-            # Buy & Hold metrics
             bh_metrics = eval_results.get("buy_and_hold", {}).get("metrics", {})
             if bh_metrics:
                 st.caption(
@@ -452,13 +464,11 @@ def main():
 
             st.divider()
 
-            # Model metrics
             model_data = eval_results.get("models", {}).get(model_name, {})
             if model_data:
                 render_metrics_cards(model_data.get("metrics", {}), model_name.upper())
                 render_portfolio_chart(eval_results, model_name)
 
-                # Allocation heatmap
                 avg_alloc = model_data.get("avg_alloc_pct", {})
                 if avg_alloc:
                     alloc_df = pd.DataFrame(
@@ -475,7 +485,7 @@ def main():
             else:
                 st.info(f"No evaluation results for {model_name.upper()} yet.")
 
-    # ── Tab 3: Model Info ─────────────────────────────────────────────────────
+    # ── Tab 3: Model Info (unchanged) ────────────────────────────────────────
     with tab3:
         st.subheader("Model Architecture & Training Info")
 
@@ -536,7 +546,6 @@ def main():
 - **Optimiser**: Adam + ReduceLROnPlateau
             """)
 
-        # Training history chart
         model_meta = load_model_meta(module, model_name)
         history    = model_meta.get("history", {})
         if history.get("train") and history.get("val"):
@@ -551,7 +560,6 @@ def main():
             )
             st.plotly_chart(fig, use_container_width=True)
 
-        # Raw price chart from HF dataset
         st.divider()
         st.markdown("**Raw Price History (Close)**")
         with st.spinner("Loading price data..."):
@@ -562,20 +570,23 @@ def main():
                     for t in cfg.TICKERS
                     if t in ohlcv_df.columns.get_level_values(0)
                 })
-                # Normalise to 100 at start for comparison
                 norm_df = close_df / close_df.iloc[0] * 100
                 fig = px.line(norm_df, title="Normalised Close Prices (base=100)", height=400)
                 st.plotly_chart(fig, use_container_width=True)
             except Exception as e:
                 st.warning(f"Could not load price chart: {e}")
 
-
-    # ── Helper: render one module summary ────────────────────────────────────
+    # ── Helper: render one module summary (with corrected date display) ───────
     def render_summary_tab(sum_module: str, sum_cfg, sum_label: str):
         """Render the full 4-variant summary for a given module."""
-        next_day = next_trading_day()
-        last_day = last_trading_day()
-        st.info(f"📅 **Prediction for:** {next_day}  |  Data through: {last_day}")
+        eval_results = load_eval_results(sum_module)
+        if not eval_results:
+            st.warning("No evaluation results found. Run training first.")
+            return
+
+        # Get correct prediction date from eval results
+        last_data_date, pred_date = get_prediction_date_from_eval(eval_results)
+        st.info(f"📅 **Prediction for:** {format_date(pred_date)}  |  Data through: {format_date(last_data_date)}")
 
         VARIANTS = [
             ("dlinear_prc",     "DLinear + PRC"),
@@ -586,7 +597,6 @@ def main():
 
         hf_meta_sum  = load_hf_metadata(sum_module)
         cache_key    = hf_meta_sum.get("last_data_update", "")
-        eval_results = load_eval_results(sum_module)
 
         # ── Section 1: Next-Day Top 2 Signals for all 4 variants ─────────────
         st.subheader("🎯 Next-Day Top 2 Signals — All Models")
@@ -600,7 +610,6 @@ def main():
                 if signals_df is None:
                     st.warning("No weights")
                 else:
-                    # Filter out HOLD (cash) row, sort by allocation
                     trading = signals_df[signals_df["Ticker"] != "HOLD (cash)"].copy()
                     trading = trading.sort_values("Allocation%", ascending=False).head(2)
                     for _, row in trading.iterrows():
@@ -629,21 +638,13 @@ If the model cannot beat simply buying and holding its own top pick, the active 
 strategy adds no value.
             """)
 
-        if not eval_results:
-            st.warning("No evaluation results found. Run training first.")
-            return
-
-        test_period = eval_results.get("test_period",
-                      eval_results.get("test_year", "N/A"))
+        test_period = eval_results.get("test_period", eval_results.get("test_year", "N/A"))
         st.caption(f"Test period: {test_period}")
 
-        # Buy & Hold baseline row
         bh = eval_results.get("buy_and_hold", {}).get("metrics", {})
 
-        # Build comparison table
         rows = []
         def compute_cagr(total_pct, n_days):
-            """Compute true CAGR from total return % and number of trading days."""
             if not isinstance(total_pct, (int, float)) or n_days <= 0:
                 return "N/A"
             n_years = n_days / 252.0
@@ -656,8 +657,6 @@ strategy adds no value.
             total  = m.get('total_return_pct', m.get('annual_return_pct', 'N/A'))
             n_days = m.get('n_days', 0)
             n_yrs  = m.get('n_years', round(n_days / 252.0, 2) if n_days else 0)
-            # Recompute CAGR properly — don't trust stored annual_return_pct
-            # since old files stored total return in that field
             cagr   = compute_cagr(total, n_days) if n_days else m.get('annual_return_pct', 'N/A')
             beats  = isinstance(total, (int,float)) and isinstance(bh_total, (int,float)) and total > bh_total
             prefix = "✅" if beats else "⚙️"
@@ -673,8 +672,6 @@ strategy adds no value.
 
         models_data = eval_results.get("models", {})
 
-        # Use model n_days for B&H period — ensures fair comparison
-        # (B&H in old JSON files may have different n_days due to alignment bug)
         model_n_days = 0
         for variant, _ in VARIANTS:
             m_check = models_data.get(variant, {}).get("metrics", {})
@@ -682,7 +679,7 @@ strategy adds no value.
                 model_n_days = m_check["n_days"]
                 break
         if model_n_days > 0:
-            bh["n_days"] = model_n_days   # align B&H period to model period
+            bh["n_days"] = model_n_days
 
         bh_total = bh.get('total_return_pct', bh.get('annual_return_pct', 0))
         rows.append(fmt_row("📈 Buy & Hold (baseline)", bh))
@@ -701,7 +698,6 @@ strategy adds no value.
             else:
                 rows.append(fmt_row(variant_label, m, bh_total))
 
-            # Add single ETF B&H row directly below each model
             single = models_data.get(variant, {}).get("single_etf_bh", {})
             if single:
                 ticker   = single.get("ticker", "")
@@ -715,7 +711,7 @@ strategy adds no value.
         metrics_df = pd.DataFrame(rows)
         st.dataframe(metrics_df, use_container_width=True, hide_index=True)
 
-        # ── Section 2b: Signal stability ─────────────────────────────────────
+        # ── Section 2b: Signal stability (unchanged) ─────────────────────────
         st.divider()
         st.subheader("🎯 Signal Stability — How Often Each ETF Was Chosen")
         st.caption(
@@ -761,7 +757,6 @@ It looks at three things across all test days:
 
                 output_stats  = model_metrics.get("output_stats", {})
 
-                # Sort by avg allocation, show top 3
                 top3 = sorted(alloc_pct.items(),
                               key=lambda x: x[1], reverse=True)[:3]
                 for ticker, alloc in top3:
@@ -771,7 +766,6 @@ It looks at three things across all test days:
                     std_out   = stats.get("std", None)
                     pct_clear = stats.get("pct_above_02", buy_pct)
 
-                    # Conviction: high mean output + low std = consistent
                     if mean_out is not None:
                         is_conviction = mean_out > 0.3 and std_out < 0.3 and pct_clear > 60
                         is_moderate   = mean_out > 0.1 and pct_clear > 40
@@ -786,10 +780,10 @@ It looks at three things across all test days:
                         line += f" | raw μ={mean_out:.2f} σ={std_out:.2f}"
                     st.markdown(line)
 
-        # ── Section 2c: Walk-forward MoLE results ────────────────────────────
+        # ── Section 2c: Walk-forward MoLE results (unchanged) ────────────────
         _wf_files = [f for f in os.listdir(sum_cfg.RESULTS_DIR)
                      if f.startswith("mole_ret_walkforward_") and f.endswith(".json")]
-        wf_path = os.path.join(sum_cfg.RESULTS_DIR, sorted(_wf_files, reverse=True)[0])                   if _wf_files else None
+        wf_path = os.path.join(sum_cfg.RESULTS_DIR, sorted(_wf_files, reverse=True)[0]) if _wf_files else None
 
         if wf_path:
             st.divider()
@@ -812,7 +806,6 @@ It looks at three things across all test days:
             wf_cols[3].metric("Max Drawdown",
                               f"{wf_metrics.get('max_drawdown_pct', 0):.2f}%")
 
-            # Last signal
             ls = wf_data.get("last_signal", {})
             if ls:
                 direction = ls.get("direction", "")
@@ -825,14 +818,13 @@ It looks at three things across all test days:
                     f"({abs(raw_val)*100:.1f}% allocated)"
                 )
 
-            # Fold summary
             with st.expander(f"📋 Fold Summary ({wf_data.get('n_folds_ok', 0)} folds)", expanded=False):
                 fold_rows = wf_data.get("fold_summary", [])
                 if fold_rows:
                     fold_df = pd.DataFrame(fold_rows)
                     st.dataframe(fold_df, use_container_width=True, hide_index=True)
 
-        # ── Section 3: Portfolio value chart — all 4 variants + B&H ─────────
+        # ── Section 3: Portfolio value chart (unchanged) ─────────────────────
         st.divider()
         st.subheader("📈 Portfolio Value — All Models vs Buy & Hold")
 
