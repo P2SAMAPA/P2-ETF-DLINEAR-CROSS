@@ -24,6 +24,10 @@ TICKERS = [
     "XLE",   # Energy
     "XLV",   # Health Care
     "XLI",   # Industrials
+    "XLY",   # Consumer Disc
+    "XLP",   # Consumer Staples
+    "XLU",   # Utilities
+    "XME",   # Metal and Mining
     "GDX",   # Gold Miners
     "IWM",   # Russell 2000 Small Cap
     # "XES" removed — Phase 3 experiment
