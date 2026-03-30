@@ -55,6 +55,8 @@ def compute_rsi(series: pd.Series, window: int = 14) -> pd.Series:
     avg_g = gain.ewm(com=window - 1, min_periods=window).mean()
     avg_l = loss.ewm(com=window - 1, min_periods=window).mean()
     rs    = avg_g / avg_l.replace(0, np.nan)
+    # Replace any remaining infinities with NaN
+    rs = rs.replace([np.inf, -np.inf], np.nan)
     return 100 - (100 / (1 + rs))
 
 
@@ -151,9 +153,12 @@ def load_data(cfg, seq_len: int = 96, batch_size: int = 32,
 
     features_df, prices_df = build_features(ohlcv_df, cfg.TICKERS)
 
-    valid       = features_df.dropna().index.intersection(prices_df.dropna().index)
+    # Replace infinities with NaN, then drop rows with any NaN
+    features_df = features_df.replace([np.inf, -np.inf], np.nan)
+    prices_df = prices_df.replace([np.inf, -np.inf], np.nan)
+    valid = features_df.dropna().index.intersection(prices_df.dropna().index)
     features_df = features_df.loc[valid]
-    prices_df   = prices_df.loc[valid]
+    prices_df = prices_df.loc[valid]
 
     # Compute timestamp features for MoLE router
     ts_features = compute_timestamp_features(features_df.index)
