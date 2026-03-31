@@ -46,11 +46,23 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Add all generated files in results/fixed_income/
           git add results/fixed_income/
+
+          # Stash any changes
           git stash
+
+          # Pull latest changes
           git pull --rebase origin main
-          git stash pop
+
+          # Restore stashed changes
+          git stash pop || echo "No stash to pop"
+
+          # Add again in case new files appeared after pull
           git add results/fixed_income/
+
+          # Commit and push if there are changes
           git diff --staged --quiet || git commit -m "chore: update fixed income model results [$(date -u '+%Y-%m-%d %H:%M UTC')]"
           git push
 
