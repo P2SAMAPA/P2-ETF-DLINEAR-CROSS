@@ -1079,11 +1079,11 @@
         "n_years": 2.34
       },
       "crossformer_ret": {
-        "total_return_pct": 178.785,
+        "total_return_pct": 178.7849,
         "annual_return_pct": 55.0621,
         "sharpe_ratio": 1.2845,
         "max_drawdown_pct": -40.468,
-        "final_value": 27878.5,
+        "final_value": 27878.49,
         "initial_value": 10000.0,
         "n_days": 589,
         "n_years": 2.34
