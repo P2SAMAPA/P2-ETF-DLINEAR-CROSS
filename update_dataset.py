@@ -20,7 +20,7 @@ OHLCV_FIELDS = ["Open", "High", "Low", "Close", "Volume"]
 
 MODULE_CONFIG = {
     "A": {
-        "tickers": ["SPY", "QQQ", "XLK", "XLF", "XLE", "XLV", "XLI", "GDX", "IWM", "XME", "XLY", "XLP", "XLU", "XES"],
+        "tickers": ["SPY", "QQQ", "XLK", "XLF", "XLE", "XLV", "XLI", "GDX", "IWM", "XME", "XLY", "XLP", "XLU", "XLB", "XLRE", "XES"],
         "hf_path_parquet": "equity/ohlcv_equity.parquet",
         "hf_path_metadata": "equity/metadata_equity.json",
         "label": "Equity ETFs",
