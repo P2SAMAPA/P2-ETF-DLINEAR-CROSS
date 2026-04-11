@@ -1201,5 +1201,61 @@
         "n_years": 2.34
       }
     }
+  },
+  {
+    "run_date": "20260411",
+    "test_period": "2023-07-18 \u2192 2026-04-10 (686 rows)",
+    "buy_and_hold": {
+      "total_return_pct": 47.1321,
+      "annual_return_pct": 17.9318,
+      "sharpe_ratio": 1.6472,
+      "max_drawdown_pct": -9.3129,
+      "final_value": 14713.21,
+      "initial_value": 10000.0,
+      "n_days": 590,
+      "n_years": 2.34
+    },
+    "models": {
+      "dlinear_prc": {
+        "total_return_pct": 132.0052,
+        "annual_return_pct": 43.3428,
+        "sharpe_ratio": 1.7972,
+        "max_drawdown_pct": -19.2095,
+        "final_value": 23200.52,
+        "initial_value": 10000.0,
+        "n_days": 589,
+        "n_years": 2.34
+      },
+      "crossformer_prc": {
+        "total_return_pct": 83.2583,
+        "annual_return_pct": 29.5836,
+        "sharpe_ratio": 1.7405,
+        "max_drawdown_pct": -13.5806,
+        "final_value": 18325.83,
+        "initial_value": 10000.0,
+        "n_days": 589,
+        "n_years": 2.34
+      },
+      "dlinear_ret": {
+        "total_return_pct": 195.6764,
+        "annual_return_pct": 59.0142,
+        "sharpe_ratio": 1.3006,
+        "max_drawdown_pct": -42.4526,
+        "final_value": 29567.64,
+        "initial_value": 10000.0,
+        "n_days": 589,
+        "n_years": 2.34
+      },
+      "crossformer_ret": {
+        "total_return_pct": 191.2991,
+        "annual_return_pct": 58.0027,
+        "sharpe_ratio": 1.2983,
+        "max_drawdown_pct": -41.8656,
+        "final_value": 29129.91,
+        "initial_value": 10000.0,
+        "n_days": 589,
+        "n_years": 2.34
+      }
+    }
   }
 ]
