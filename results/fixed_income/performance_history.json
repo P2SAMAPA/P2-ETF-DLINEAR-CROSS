@@ -1284,7 +1284,7 @@
       },
       "crossformer_prc": {
         "total_return_pct": 120.8754,
-        "annual_return_pct": 40.3593,
+        "annual_return_pct": 40.3594,
         "sharpe_ratio": 1.7561,
         "max_drawdown_pct": -18.4685,
         "final_value": 22087.54,
@@ -1293,11 +1293,11 @@
         "n_years": 2.34
       },
       "dlinear_ret": {
-        "total_return_pct": 196.0993,
+        "total_return_pct": 196.0994,
         "annual_return_pct": 59.1115,
         "sharpe_ratio": 1.302,
         "max_drawdown_pct": -42.4526,
-        "final_value": 29609.93,
+        "final_value": 29609.94,
         "initial_value": 10000.0,
         "n_days": 589,
         "n_years": 2.34
