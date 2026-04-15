@@ -1339,11 +1339,11 @@
         "n_years": 2.34
       },
       "crossformer_prc": {
-        "total_return_pct": 80.3093,
-        "annual_return_pct": 28.6323,
-        "sharpe_ratio": 1.6956,
-        "max_drawdown_pct": -13.5802,
-        "final_value": 18030.93,
+        "total_return_pct": 80.3037,
+        "annual_return_pct": 28.6306,
+        "sharpe_ratio": 1.6955,
+        "max_drawdown_pct": -13.5806,
+        "final_value": 18030.37,
         "initial_value": 10000.0,
         "n_days": 590,
         "n_years": 2.34
@@ -1359,11 +1359,11 @@
         "n_years": 2.34
       },
       "crossformer_ret": {
-        "total_return_pct": 188.4233,
-        "annual_return_pct": 57.2127,
+        "total_return_pct": 188.4249,
+        "annual_return_pct": 57.213,
         "sharpe_ratio": 1.287,
-        "max_drawdown_pct": -41.8659,
-        "final_value": 28842.33,
+        "max_drawdown_pct": -41.8656,
+        "final_value": 28842.49,
         "initial_value": 10000.0,
         "n_days": 590,
         "n_years": 2.34

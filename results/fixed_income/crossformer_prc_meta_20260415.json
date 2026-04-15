@@ -6,8 +6,8 @@
   "label": "Fixed Income / Commodity ETFs",
   "best_val_loss": 0.4507806872328122,
   "epochs_trained": 32,
-  "trained_at": "2026-04-14 23:26:11 UTC",
-  "run_date": "20260414",
+  "trained_at": "2026-04-15 03:51:02 UTC",
+  "run_date": "20260415",
   "tickers": [
     "TLT",
     "VNQ",
