@@ -8,7 +8,7 @@ name: Train — Option A Equity (Crossformer)
 
 on:
   schedule:
-    - cron: "0 22 * * 1-5"    # Mon-Fri 22:00 UTC (same time as linear)
+    - cron: "0 23 * * 1-5"    # Mon-Fri 22:00 UTC (same time as linear)
   workflow_dispatch:
 
 permissions:
