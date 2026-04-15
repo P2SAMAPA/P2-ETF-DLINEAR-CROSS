@@ -6,7 +6,7 @@ name: Train — Option B (Fixed Income / Commodities)
 
 on:
   schedule:
-    - cron: "30 22 * * 1-5"   # Mon–Fri at 22:30 UTC (staggered 30 min after equity)
+    - cron: "30 23 * * 1-5"   # Mon–Fri at 22:30 UTC (staggered 30 min after equity)
   workflow_dispatch:           # manual trigger from GitHub Actions UI
 
 permissions:
