@@ -6,8 +6,8 @@
   "label": "Equity ETFs",
   "best_val_loss": 0.47685758272806805,
   "epochs_trained": 237,
-  "trained_at": "2026-04-14 22:52:55 UTC",
-  "run_date": "20260414",
+  "trained_at": "2026-04-15 03:10:10 UTC",
+  "run_date": "20260415",
   "tickers": [
     "SPY",
     "QQQ",
