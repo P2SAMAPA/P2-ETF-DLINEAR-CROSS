@@ -32,6 +32,9 @@ TICKERS = [
     "XLRE",  # Real Estate
     "GDX",   # Gold Miners
     "IWM",   # Russell 2000 Small Cap
+    "IWF",
+    "XSD",
+    "XBI",
     # "XES" removed — Phase 3 experiment
 ]
 
