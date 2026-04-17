@@ -1472,9 +1472,9 @@
       },
       "crossformer_ret": {
         "total_return_pct": 136.003,
-        "annual_return_pct": 44.3046,
+        "annual_return_pct": 44.3045,
         "sharpe_ratio": 1.3017,
-        "max_drawdown_pct": -33.213,
+        "max_drawdown_pct": -33.2131,
         "final_value": 23600.3,
         "initial_value": 10000.0,
         "n_days": 590,
