@@ -31,11 +31,11 @@ TICKERS = [
     "XLB",   # Basic Materials
     "XLRE",  # Real Estate
     "GDX",   # Gold Miners
-    "IWM",   # Russell 2000 Small Cap
     "IWF",
     "XSD",
     "XBI",
-    # "XES" removed — Phase 3 experiment
+    "IWM",   # Russell 2000 Small Cap
+             # "XES" removed — Phase 3 experiment
 ]
 
 START_DATE = "2006-01-01"
