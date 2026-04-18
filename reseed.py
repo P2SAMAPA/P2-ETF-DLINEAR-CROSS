@@ -33,7 +33,8 @@ from huggingface_hub import HfApi, CommitOperationAdd
 HF_DATASET_REPO = "P2SAMAPA/etf-dlinear-cross-data"
 
 # Option A — Equity ETFs
-EQUITY_TICKERS  = ["SPY", "QQQ", "XLK", "XLF", "XLE", "XLV", "XLI", "GDX", "IWM", "XME", "XLY", "XLP", "XLU", "XLB", "XLRE", "XES"]
+EQUITY_TICKERS  = ["SPY", "QQQ", "XLK", "XLF", "XLE", "XLV", "XLI", "GDX", "IWM", "XME", "XLY", "XLP", "XLU", "XLB", "XLRE", "XES", "IWF",
+    "XSD", "XBI"]
 EQUITY_START    = "2006-01-01"
 
 # Option B — Fixed Income / Commodity ETFs
