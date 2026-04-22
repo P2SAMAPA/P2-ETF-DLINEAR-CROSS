@@ -1610,7 +1610,7 @@
     "models": {
       "dlinear_prc": {
         "total_return_pct": 138.1436,
-        "annual_return_pct": 44.8621,
+        "annual_return_pct": 44.8622,
         "sharpe_ratio": 1.8494,
         "max_drawdown_pct": -19.2095,
         "final_value": 23814.36,
@@ -1620,7 +1620,7 @@
       },
       "crossformer_prc": {
         "total_return_pct": 62.1645,
-        "annual_return_pct": 22.9352,
+        "annual_return_pct": 22.9351,
         "sharpe_ratio": 1.7286,
         "max_drawdown_pct": -10.3501,
         "final_value": 16216.45,
