@@ -29,6 +29,8 @@ TICKERS = [
     "XLU",   # Utilities
     "XME",   # Metal and Mining
     "IWF",
+    "IWD",
+    "IWO",
     "XSD",
     "XBI",
     "XLB",   # Basic Materials
