@@ -5,7 +5,7 @@ name: Update Dataset (Daily) — DEBUG
 
 on:
   schedule:
-    - cron: "30 21 * * 1-5"
+    - cron: "30 22 * * 1-5"
   workflow_dispatch:
     inputs:
       action:
